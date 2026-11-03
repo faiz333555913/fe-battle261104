@@ -1,0 +1,110 @@
+{
+  "comment": "ラグズの職業(v1.2.0で解禁)。化身後(transformed)と化身前(untransformed)の基本値・成長率・上限は classes_raw/classes_growth/classes_maxparam の該当クラスを参照する。化身による能力上昇 = 化身後の基本値 − 化身前の基本値。獅子・白竜は除外(ガトー指示)。サギ(攻撃不可)、ティバーン・ネサラ(固有キャラ)も対象外。レベルはLv10相当(ガトー指示、ベオクとの釣り合いのため)。虎・タカ・カラスは元データに男女の区別がないため男女共用とした。赤竜のブレスは物理扱い(赤竜は力が高く魔力が低いため)。 v1.3.1:赤竜は強すぎるため出禁(banned:true。新しく生成されず、保存済みの赤竜もバトルに出せない)。化身ゲージの初期値は幸運、鳥翼族のみ+10(ガトー指示)。 v1.3.3:タカの初期ゲージボーナスを+10→+8、被ダメージ時のゲージ上昇を+2→+3、その場で化身・化身したラウンドは-5免除(ガトー指示)。",
+  "level": 10,
+  "transformGauge": {
+    "max": 20,
+    "initial": "幸運(上限20)。タカ+8・カラス+10",
+    "roundGain": 4,
+    "damageGain": 3,
+    "decay": 5,
+    "note": "v1.3.3:最初は化身前。ゲージの初期値は幸運(タカ+8・カラス+10)。化身前ならラウンド1開始時と各ラウンド終了時に+4、ダメージを受けるたびに+3(ポイズン・燃焼は除く)。20になった時点でその場で化身して戦闘を続ける(ただし流星・天空・連続・疾風の刃などスキルによる連続攻撃の最中は、その効果が終わるまで化身しない)。化身したラウンドの終了時は-5しない。化身中はそれ以外のラウンド終了ごとに-5、0で化身が解ける(解けた後もまた溜まる)。化身前も攻撃できるが、爪・くちばし・ブレスの威力は0になる。"
+  },
+  "classes": [
+    {
+      "name": "猫(女)",
+      "untransformed": "獣牙族(猫・女)",
+      "tribe": "獣牙族",
+      "gender": "女",
+      "moveType": "歩行",
+      "weapon": "爪(猫)",
+      "effectivenessTags": [
+        "獣牙族"
+      ],
+      "colorGroup": "cat"
+    },
+    {
+      "name": "猫(男)",
+      "untransformed": "獣牙族(猫・男)",
+      "tribe": "獣牙族",
+      "gender": "男",
+      "moveType": "歩行",
+      "weapon": "爪(猫)",
+      "effectivenessTags": [
+        "獣牙族"
+      ],
+      "colorGroup": "cat"
+    },
+    {
+      "name": "虎",
+      "untransformed": "獣牙族(虎)",
+      "tribe": "獣牙族",
+      "gender": "共用",
+      "moveType": "歩行",
+      "weapon": "爪(虎)",
+      "effectivenessTags": [
+        "獣牙族"
+      ],
+      "colorGroup": "tiger"
+    },
+    {
+      "name": "タカ",
+      "untransformed": "鳥翼族(タカ)",
+      "tribe": "鳥翼族",
+      "gender": "共用",
+      "moveType": "飛行",
+      "weapon": "くちばし(タカ)",
+      "effectivenessTags": [
+        "鳥翼族",
+        "飛行系"
+      ],
+      "colorGroup": "hawk"
+    },
+    {
+      "name": "カラス",
+      "untransformed": "鳥翼族(カラス)",
+      "tribe": "鳥翼族",
+      "gender": "共用",
+      "moveType": "飛行",
+      "weapon": "くちばし(カラス)",
+      "effectivenessTags": [
+        "鳥翼族",
+        "飛行系"
+      ],
+      "colorGroup": "raven"
+    },
+    {
+      "name": "赤竜(女)",
+      "untransformed": "竜鱗族(女)",
+      "tribe": "竜鱗族",
+      "gender": "女",
+      "moveType": "歩行",
+      "weapon": "ブレス(赤竜)",
+      "effectivenessTags": [
+        "竜鱗族"
+      ],
+      "colorGroup": "dragon",
+      "banned": true
+    },
+    {
+      "name": "赤竜(男)",
+      "untransformed": "竜鱗族(男)",
+      "tribe": "竜鱗族",
+      "gender": "男",
+      "moveType": "歩行",
+      "weapon": "ブレス(赤竜)",
+      "effectivenessTags": [
+        "竜鱗族"
+      ],
+      "colorGroup": "dragon",
+      "banned": true
+    }
+  ],
+  "gaugeBonusByTribe": {
+    "鳥翼族": 10
+  },
+  "gaugeBonusByClass": {
+    "タカ": 8,
+    "カラス": 10
+  },
+  "gaugeBonusNote": "v1.3.3:クラス別の指定(gaugeBonusByClass)を優先。タカ+8・カラス+10。指定がなければ部族別(gaugeBonusByTribe)"
+}

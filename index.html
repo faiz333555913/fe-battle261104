@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="闘技場">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<title>闘技場バトル</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <img src="assets/logo.avif" alt="ロゴ" class="logo">
+    <button type="button" class="link-btn" data-goto="title" id="nav-home" hidden>タイトルへ戻る</button>
+  </header>
+
+  <main id="app">
+
+    <!-- タイトル -->
+    <section id="screen-title" class="screen active">
+      <div class="title-box">
+        <p class="title-sub">― 名前に宿る力で戦え ―</p>
+        <h1 class="title-heading">闘技場バトル</h1>
+        <p class="version">v1.3.5</p>
+        <nav class="title-menu">
+          <button type="button" class="btn btn-main" data-goto="create">キャラ作成</button>
+          <button type="button" class="btn btn-main" data-goto="list">キャラ一覧</button>
+          <button type="button" class="btn btn-main" data-goto="prep">バトル</button>
+        </nav>
+      </div>
+    </section>
+
+    <!-- キャラ作成 -->
+    <section id="screen-create" class="screen">
+      <h2 class="screen-title">キャラ作成</h2>
+      <div class="create-layout">
+        <form id="create-form" class="panel form" autocomplete="off" novalidate>
+          <label class="field">
+            <span class="field-label">名前<small>(8文字まで・漢字は使えません)</small></span>
+            <input type="text" name="name" maxlength="16" placeholder="ガトー">
+            <span class="field-error" data-error="name"></span>
+          </label>
+          <div class="field">
+            <span class="field-label">性別</span>
+            <div class="choice-row" id="gender-picker"></div>
+            <span class="field-error" data-error="gender"></span>
+          </div>
+          <div class="field">
+            <span class="field-label">種族</span>
+            <div class="choice-row" id="race-picker"></div>
+            <p class="race-note" id="race-note"></p>
+            <span class="field-error" data-error="race"></span>
+          </div>
+          <label class="field">
+            <span class="field-label">好きな漢字<small>(1文字)</small></span>
+            <input type="text" name="kanji" maxlength="4" placeholder="罵" class="input-kanji">
+            <span class="field-error" data-error="kanji"></span>
+          </label>
+          <div class="field">
+            <span class="field-label">好きな色</span>
+            <div class="color-picker" id="color-picker"></div>
+            <span class="field-error" data-error="color"></span>
+          </div>
+          <label class="field">
+            <span class="field-label">生年月日<small>(8桁 例:19800123)</small></span>
+            <input type="text" name="birthdate" maxlength="12" inputmode="numeric" placeholder="19800123">
+            <span class="field-error" data-error="birthdate"></span>
+          </label>
+          <button type="submit" class="btn btn-main">キャラを生み出す</button>
+        </form>
+        <div id="create-result" class="create-result">
+          <p class="hint">4つの項目を入力すると、キャラが生まれます。<br>同じ入力からは、いつも同じキャラが生まれます。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- キャラ一覧 -->
+    <section id="screen-list" class="screen">
+      <h2 class="screen-title">キャラ一覧</h2>
+      <div class="list-toolbar">
+        <span id="list-count" class="muted"></span>
+        <div class="spacer"></div>
+        <button type="button" class="btn" id="btn-export">書き出し(JSON)</button>
+        <label class="btn">読み込み(JSON)<input type="file" id="input-import" accept=".json,application/json" hidden></label>
+      </div>
+      <p id="list-message" class="message" hidden></p>
+      <div class="list-layout">
+        <ul id="char-list" class="char-list"></ul>
+        <div id="char-detail" class="char-detail"></div>
+      </div>
+    </section>
+
+    <!-- バトル準備 -->
+    <section id="screen-prep" class="screen">
+      <h2 class="screen-title">バトル準備</h2>
+      <div id="prep-empty" class="panel hint" hidden>
+        バトルにはキャラが必要です。<button type="button" class="link-btn" data-goto="create">キャラ作成</button>からキャラを作って保存してください。
+      </div>
+      <div id="prep-body" class="prep-layout">
+        <div class="prep-side" data-side="left"></div>
+        <div class="prep-center">
+          <div id="forecast" class="forecast"></div>
+          <button type="button" class="btn btn-main btn-start" id="btn-start" disabled>対戦開始</button>
+        </div>
+        <div class="prep-side" data-side="right"></div>
+      </div>
+    </section>
+
+    <!-- バトル -->
+    <section id="screen-battle" class="screen">
+      <div class="arena" id="arena">
+        <div class="fighter" data-side="left"></div>
+        <div class="arena-mid">
+          <div id="round-label" class="round-label"></div>
+          <div class="vs">VS</div>
+        </div>
+        <div class="fighter" data-side="right"></div>
+        <div class="arena-fx" id="arena-fx" aria-live="polite"></div>
+      </div>
+      <div class="battle-controls">
+        <button type="button" class="btn btn-small" id="btn-speed">速度:ふつう</button>
+        <button type="button" class="btn btn-small" id="btn-skip">結果まで飛ばす</button>
+      </div>
+      <ol id="battle-log" class="battle-log"></ol>
+      <div id="battle-result" class="battle-result" hidden>
+        <p id="result-text" class="result-text"></p>
+        <div class="result-buttons">
+          <button type="button" class="btn btn-main btn-rematch" id="btn-rematch">もう一度(スキル引き直し)</button>
+          <button type="button" class="btn btn-main btn-rematch" id="btn-rematch-keep">スキルそのままでもう一度</button>
+          <button type="button" class="btn" data-goto="prep">キャラ選択に戻る</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- v1.3.5:スマホを縦にしてバトル準備・バトルを開いたときの案内(横画面専用) -->
+  <div class="rotate-hint" aria-live="polite">
+    <div class="rotate-box">
+      <div class="rotate-icon" aria-hidden="true"><span></span></div>
+      <p>スマホを<b>横向き</b>にしてください</p>
+      <small>バトル準備・バトルは横画面専用です</small>
+    </div>
+  </div>
+
+  <!-- スキルルーレット -->
+  <div id="roulette" class="overlay" hidden>
+    <div class="roulette-box">
+      <p class="roulette-title" id="roulette-title">スキル抽選</p>
+      <div class="roulette-row">
+        <div class="roulette-slot" data-side="left"><span class="r-name"></span><span class="r-skill">―</span></div>
+        <div class="roulette-slot" data-side="right"><span class="r-name"></span><span class="r-skill">―</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/gamedata.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/rng.js"></script>
+  <script src="js/gamedb.js"></script>
+  <script src="js/generator.js"></script>
+  <script src="js/battle.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
