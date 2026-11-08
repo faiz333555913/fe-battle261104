@@ -1,0 +1,442 @@
+{
+  "comment": "出典: pegasusknight.com『アイテム/剣』(ガトー提供のスクリーンショットより2026-11-01時点で転記)。exclusive: true の武器は特定キャラクター専用のためランダム抽選対象から除外する想定(要確認)。ソニックソードはmagicDamage:trueで、攻撃力に力ではなく魔力、相手の防御に守備ではなく魔防を使用する魔力依存武器(2026-11-01修正)。 祈り・回復シリーズ(custom:true、weaponSkillでスキルを付与)はv1.2.0で追加。",
+  "category": "sword",
+  "weapons": [
+    {
+      "name": "どくの剣",
+      "weaponLv": "D",
+      "price": 520,
+      "might": 3,
+      "hit": 70,
+      "weight": 8,
+      "uses": 40,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 1,
+      "effect": "ポイズン付与",
+      "exclusive": false
+    },
+    {
+      "name": "細身の剣",
+      "weaponLv": "E",
+      "price": 560,
+      "might": 3,
+      "hit": 100,
+      "weight": 5,
+      "uses": 35,
+      "crit": 5,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 1,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "てつの剣",
+      "weaponLv": "E",
+      "price": 460,
+      "might": 5,
+      "hit": 90,
+      "weight": 7,
+      "uses": 46,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 1,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "訓練用の剣",
+      "weaponLv": "E",
+      "price": 230,
+      "might": 6,
+      "hit": 150,
+      "weight": 3,
+      "uses": null,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 1,
+      "effect": "必殺が出ない",
+      "exclusive": false
+    },
+    {
+      "name": "長柄刀",
+      "weaponLv": "D",
+      "price": 1260,
+      "might": 6,
+      "hit": 85,
+      "weight": 12,
+      "uses": 18,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": "アクスナイト・ソードナイト・パラディン・ボウナイト・ランスナイトに特効",
+      "desc": "騎馬系に特効",
+      "exclusive": false
+    },
+    {
+      "name": "リガルソード",
+      "weaponLv": null,
+      "price": null,
+      "might": 7,
+      "hit": 95,
+      "weight": 6,
+      "uses": 40,
+      "crit": 10,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": "アクスナイト・ソードナイト・パラディン・ボウナイト・ランスナイト・ジェネラル・重歩兵に特効/アイク専用/売却不可",
+      "desc": "騎馬系・アーマー系に特効/アイク専用",
+      "exclusive": true,
+      "exclusiveOwner": "アイク"
+    },
+    {
+      "name": "はがねの剣",
+      "weaponLv": "D",
+      "price": 700,
+      "might": 8,
+      "hit": 75,
+      "weight": 12,
+      "uses": 35,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "アーマーキラー",
+      "weaponLv": "D",
+      "price": 1260,
+      "might": 8,
+      "hit": 80,
+      "weight": 14,
+      "uses": 18,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": "ジェネラル・重歩兵に特効",
+      "desc": "アーマー系に特効",
+      "exclusive": false
+    },
+    {
+      "name": "てつの大剣",
+      "weaponLv": "D",
+      "price": 980,
+      "might": 9,
+      "hit": 70,
+      "weight": 15,
+      "uses": 35,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "キルソード",
+      "weaponLv": "C",
+      "price": 1300,
+      "might": 9,
+      "hit": 75,
+      "weight": 9,
+      "uses": 20,
+      "crit": 30,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": null,
+      "exclusive": false,
+      "rarity": 3,
+      "rarityNote": "v1.4.5:キラー系はレア度★★→★★★(ガトー指示)"
+    },
+    {
+      "name": "ラグズソード",
+      "weaponLv": "C",
+      "price": 1800,
+      "might": 9,
+      "hit": 75,
+      "weight": 12,
+      "uses": 15,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": "カラス・サギ・タカ・猫・獅子・獣牙族・白竜・竜鱗族・虎・赤竜・鳥翼族・黒竜に特効",
+      "desc": "ラグズに特効",
+      "exclusive": false
+    },
+    {
+      "name": "勇者の剣",
+      "weaponLv": "B",
+      "price": 5400,
+      "might": 9,
+      "hit": 75,
+      "weight": 16,
+      "uses": 30,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 1,
+      "effect": "2回攻撃",
+      "exclusive": false
+    },
+    {
+      "name": "アミーテ",
+      "weaponLv": null,
+      "price": null,
+      "might": 9,
+      "hit": 75,
+      "weight": 12,
+      "uses": null,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": "エリンシア専用/売却不可/2回攻撃/守備+3/魔防+3",
+      "desc": "2回攻撃/守備+3/魔防+3/エリンシア専用",
+      "exclusive": true,
+      "exclusiveOwner": "エリンシア"
+    },
+    {
+      "name": "ソニックソード",
+      "weaponLv": "B",
+      "price": 5500,
+      "might": 10,
+      "hit": 70,
+      "weight": 9,
+      "uses": 25,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 1,
+      "effect": "カラス・クリミア王女・サギ・タカ・デイン国王・ドラゴンナイト・ドラゴンマスター・ファルコンナイト・ペガサスナイトに特効/魔力依存(攻撃力・ダメージ計算に力ではなく魔力、相手の防御力に守備ではなく魔防を使用。剣だが魔法武器として扱う)",
+      "desc": "飛行系に特効/魔法武器(魔力で攻撃し、相手は魔防で受ける)",
+      "exclusive": false,
+      "magicDamage": true
+    },
+    {
+      "name": "はがねの大剣",
+      "weaponLv": "C",
+      "price": 700,
+      "might": 11,
+      "hit": 75,
+      "weight": 17,
+      "uses": 35,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "ヴァーグ・カティ",
+      "weaponLv": "S",
+      "price": null,
+      "might": 12,
+      "hit": 80,
+      "weight": 8,
+      "uses": 25,
+      "crit": 35,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": "売却不可/守備+3",
+      "desc": "守備+3",
+      "exclusive": true,
+      "exclusiveOwner": null
+    },
+    {
+      "name": "ぎんの剣",
+      "weaponLv": "A",
+      "price": 1875,
+      "might": 13,
+      "hit": 80,
+      "weight": 11,
+      "uses": 25,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "ぎんの大剣",
+      "weaponLv": "A",
+      "price": 1800,
+      "might": 15,
+      "hit": 60,
+      "weight": 14,
+      "uses": 15,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 2,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "ルーンソード",
+      "weaponLv": "A",
+      "price": 7200,
+      "might": 15,
+      "hit": 65,
+      "weight": 19,
+      "uses": 15,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": "敵に与えたダメージ分、自分のHPを回復",
+      "desc": "与えたダメージ分HP回復",
+      "exclusive": false
+    },
+    {
+      "name": "エタルド",
+      "weaponLv": null,
+      "price": null,
+      "might": 18,
+      "hit": 80,
+      "weight": 20,
+      "uses": null,
+      "crit": 5,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": "漆黒の騎士専用/売却不可/守備+5",
+      "desc": "守備+5/漆黒の騎士専用",
+      "exclusive": true,
+      "exclusiveOwner": "漆黒の騎士"
+    },
+    {
+      "name": "ラグネル",
+      "weaponLv": null,
+      "price": null,
+      "might": 18,
+      "hit": 80,
+      "weight": 20,
+      "uses": null,
+      "crit": 5,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": "アイク専用/売却不可/女神の祝福を受けた防具に攻撃可能/守備+5",
+      "desc": "守備+5/アイク専用",
+      "exclusive": true,
+      "exclusiveOwner": "アイク"
+    },
+    {
+      "name": "グルグラント",
+      "weaponLv": null,
+      "price": null,
+      "might": 20,
+      "hit": 90,
+      "weight": 25,
+      "uses": null,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": "アシュナード専用/売却不可",
+      "desc": "アシュナード専用",
+      "exclusive": true,
+      "exclusiveOwner": "アシュナード"
+    },
+    {
+      "name": "祈りの剣",
+      "weaponLv": null,
+      "price": null,
+      "might": 5,
+      "hit": 95,
+      "weight": 5,
+      "uses": null,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": null,
+      "effect": "スキル『祈り』が付く(武器スキル)",
+      "desc": "スキル『祈り』付き",
+      "exclusive": false,
+      "custom": true,
+      "weaponSkill": "祈り",
+      "note": "オリジナル武器(v1.2.0追加、v1.3.0でガトー指示により変更)。性能はてつの剣から命中+5・重さ-2"
+    },
+    {
+      "name": "回復の剣",
+      "weaponLv": null,
+      "price": null,
+      "might": 5,
+      "hit": 95,
+      "weight": 5,
+      "uses": null,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": null,
+      "effect": "スキル『回復』が付く(武器スキル)",
+      "desc": "スキル『回復』付き",
+      "exclusive": false,
+      "custom": true,
+      "weaponSkill": "回復",
+      "note": "オリジナル武器(v1.2.0追加、v1.3.0でガトー指示により変更)。性能はてつの剣から命中+5・重さ-2"
+    }
+  ]
+}

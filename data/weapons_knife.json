@@ -1,0 +1,98 @@
+{
+  "comment": "出典: pegasusknight.com『アイテム/軽器』(ガトー提供のスクリーンショットより2026-11-01時点で転記)。武器LVの概念がなく(シーフ/盗賊系職業が無条件で使用)、専用武器なし。custom:true の2種はバランス調整のためAIが考案したオリジナル武器(蒼炎の軌跡には存在しない、ガトー確認済み・ネーミング一任)。名称はカタカナで統一。",
+  "category": "knife",
+  "weapons": [
+    {
+      "name": "ナイフ",
+      "weaponLv": null,
+      "price": 480,
+      "might": 2,
+      "hit": 100,
+      "weight": 2,
+      "uses": 30,
+      "crit": 5,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 1,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "ダガー",
+      "weaponLv": null,
+      "price": 600,
+      "might": 4,
+      "hit": 90,
+      "weight": 4,
+      "uses": 30,
+      "crit": 0,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 1,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "スティレット",
+      "weaponLv": null,
+      "price": 1500,
+      "might": 8,
+      "hit": 95,
+      "weight": 8,
+      "uses": 20,
+      "crit": 10,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 1,
+      "effect": "ジェネラル・重歩兵に特効",
+      "desc": "アーマー系に特効",
+      "exclusive": false
+    },
+    {
+      "name": "ポイズンニードル",
+      "weaponLv": null,
+      "price": null,
+      "might": 6,
+      "hit": 90,
+      "weight": 3,
+      "uses": 25,
+      "crit": 5,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 1,
+      "effect": "ポイズン付与(命中時、対象に2ターンの継続ダメージ。毎ターンHPの8%を失う)",
+      "desc": "ポイズン付与",
+      "exclusive": false,
+      "custom": true,
+      "note": "オリジナル武器(バランス調整用)。旧名:忍びの毒針"
+    },
+    {
+      "name": "シャドウエッジ",
+      "weaponLv": null,
+      "price": null,
+      "might": 10,
+      "hit": 85,
+      "weight": 6,
+      "uses": 20,
+      "crit": 10,
+      "range": [
+        1,
+        1
+      ],
+      "weaponExp": 1,
+      "effect": "必ず先攻を取れる(速さの数値に関わらず、この武器を装備している側が先手)",
+      "desc": "必ず先攻",
+      "exclusive": false,
+      "custom": true,
+      "note": "オリジナル武器(バランス調整用)。旧名:隠し刃"
+    }
+  ]
+}

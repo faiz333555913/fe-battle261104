@@ -1,0 +1,115 @@
+{
+  "comment": "出典: pegasusknight.com『アイテム/炎』(ガトー提供のスクリーンショットより2026-11-01時点で転記)。炎は全種、猫・獅子・虎に共通で特効がある。メティオは射程3~10の攻城兵器のため、弓の攻城兵器4種と同じ方針でランダム抽選から除外(exclusive:true)。custom:trueの1種は魔道士の選択肢を広げるためAIが考案したオリジナル武器(蒼炎の軌跡には存在しない、ガトー確認済み・ネーミング一任)。 v1.3.0:紅蓮の書の『やけど』を『燃焼』(毎ターン最大HPの20%)に変更。 v1.3.4:レクスフレイムを追加(ガトー提供)。",
+  "category": "flame",
+  "effectivenessNote": "このカテゴリの武器は全て、猫・獅子・虎に特効を持つ",
+  "weapons": [
+    {
+      "name": "ファイアー",
+      "weaponLv": "E",
+      "price": 560,
+      "might": 3,
+      "hit": 95,
+      "weight": 3,
+      "uses": 40,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 1,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "エルファイアー",
+      "weaponLv": "D",
+      "price": 1800,
+      "might": 5,
+      "hit": 85,
+      "weight": 5,
+      "uses": 30,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "ボルガノン",
+      "weaponLv": "A",
+      "price": 2000,
+      "might": 9,
+      "hit": 85,
+      "weight": 9,
+      "uses": 20,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "メティオ",
+      "weaponLv": "C",
+      "price": 750,
+      "might": 11,
+      "hit": 70,
+      "weight": 11,
+      "uses": 5,
+      "crit": 0,
+      "range": [
+        3,
+        10
+      ],
+      "weaponExp": 3,
+      "effect": null,
+      "exclusive": true,
+      "exclusiveOwner": null,
+      "notes": "攻城兵器(範囲3~10)。1対1闘技場のランダム抽選からは除外(弓の攻城兵器と同方針)"
+    },
+    {
+      "name": "紅蓮の書",
+      "weaponLv": null,
+      "price": null,
+      "might": 9,
+      "hit": 75,
+      "weight": 10,
+      "uses": 15,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": "猫・獅子・虎に特効/燃焼付与(命中時、対象に2ターンの継続ダメージ。毎ターンHPの20%を失う)",
+      "desc": "獣牙族に特効/燃焼付与",
+      "exclusive": false,
+      "custom": true,
+      "note": "オリジナル武器(バランス調整用)、上位枠。威力-4調整済み"
+    },
+    {
+      "name": "レクスフレイム",
+      "weaponLv": "S",
+      "price": null,
+      "might": 14,
+      "hit": 85,
+      "weight": 12,
+      "uses": 20,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": "獣牙族に特効/速さ+3",
+      "exclusive": false,
+      "note": "v1.3.4追加(ガトー提供)。蒼炎では未使用データ(正式登場は暁の女神)。内部名FORBLAZE。炎の共通特効(猫・獅子・虎)に加えて獣牙族に特効"
+    }
+  ]
+}
