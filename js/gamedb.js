@@ -46,6 +46,7 @@
       weight: raw.weight,
       weaponLv: raw.weaponLv,
       rarity: raw.rarity || null, // v1.4.5:レア度の個別指定(キラー系は3=★★★)
+      stars: raw.stars || null,   // v1.6.4:★の数の個別指定(出やすさは rarity のまま。スキル付きの武器は★2)
       effect: raw.effect,
       desc: raw.desc || raw.effect || null, // v1.4.4:画面に出す短い説明(effect は効果の判定用)
       custom: !!raw.custom,
@@ -64,6 +65,12 @@
       statBonus,
       selfDamage: !!raw.selfDamage,
       weaponSkill: raw.weaponSkill || null,
+      // v1.6.3:ラグネル・エタルド。装備していると、相手の必殺が0になる
+      critGuard: effect.includes("相手の必殺0"),
+      // v1.6.5:当てると相手の能力(HP・体格以外)をランダムに下げる { count: いくつ, amount: いくつ下げる }(長弓・蛇毒のナイフ・バルフレチェ)
+      statDown: raw.statDown || null,
+      // v1.6.5:この職業だけがキャラ作成で持てる(バルフレチェ=アーチャー)。null ならだれでも
+      onlyClasses: raw.onlyClasses || null,
     };
   }
 
@@ -78,6 +85,13 @@
     }
   }
 
+  // v1.6.5:名前が変わった武器。前の名前(保存されたキャラ・アーケードの途中のデータ)でも引けるようにする。
+  //   列挙はされない(データ集・抽選に二重に出ない)
+  const weaponRenames = { "knife:ポイズンニードル": "knife:蛇毒のナイフ", "knife:シャドウエッジ": "knife:待ち伏せのダガー" };
+  for (const [from, to] of Object.entries(weaponRenames)) {
+    if (weapons[to] && !weapons[from]) Object.defineProperty(weapons, from, { value: weapons[to], enumerable: false });
+  }
+
   function weaponRarity(w) {
     if (w.rarity) return w.rarity; // v1.4.5
     if (w.custom) return C.rarityCustom;
@@ -89,14 +103,16 @@
   // 表示用のレア度(★の数)
   function weaponStars(w) {
     if (w.category === "laguz") return 0;
+    if (w.stars) return w.stars; // v1.6.4
     const r = weaponRarity(w);
     return r >= 8 ? 1 : r >= 5 ? 2 : r >= 3 ? 3 : r >= 2 ? 4 : 5;
   }
 
   // v1.4.3:印の対象の武器か
+  // v1.6.4:スキル付きの武器(祈りの剣など)も対象(weaponMark.skillWeapons)
   function isMarkable(w) {
     const m = C.weaponMark;
-    return !!w && (m.prefixes.some((p) => w.name.startsWith(p)) || m.names.includes(w.name));
+    return !!w && (m.prefixes.some((p) => w.name.startsWith(p)) || m.names.includes(w.name) || (!!m.skillWeapons && !!w.weaponSkill));
   }
   // 印のついた武器(印がなければそのまま)。重さは0未満にならない
   function withMark(w, mark) {
@@ -193,6 +209,11 @@
     return { name: to, from: pickStats(from), base: pickStats(rawByName[to]), max: pickMax(to) };
   }
 
+  // v1.6.1:職業の能力値の上限(漆黒の騎士の「ジェネラル(漆黒の騎士)」など、キャラ作成に出ない職業も)
+  function classMaxOf(name) {
+    return maxByName[name] ? pickMax(name) : null;
+  }
+
   // v1.4.5:兵種スキルの名前(職業名そのまま →(男)(女)などを除いた名前の順に照合)
   function classSkillOf(className) {
     const m = C.classSkills || {};
@@ -201,12 +222,26 @@
 
   // ---- スキル・属性 ----
   const skills = D.skills.skills;
+  // v1.6.3:抽選に出てよいスキルか(抽選・アーケードの持ち越し・トーナメントの交換・スキル選択で共通)
+  //   who = { race, className, magic }(magic:魔法の武器を持っている/使う)
+  //   兵種スキル(classOnly)は出ない。陽光は魔法だけ。エリートは上級職のあるベオクだけ。
+  //   翼の守護はタカ・カラスだけ(onlyClasses)。大盾はタカ・カラス以外のラグズだけ(laguzOnly + excludeClasses)
+  function skillFits(s, who) {
+    if (!s || s.classOnly) return false;
+    const laguz = who.race === "ラグズ";
+    const base = baseClassName(who.className || "");
+    if (s.magicOnly && !who.magic) return false;
+    if (s.beorcOnly && (laguz || !promotionOf(who.className))) return false;
+    if (s.onlyClasses && !s.onlyClasses.includes(base)) return false;
+    if (s.laguzOnly && (!laguz || (s.excludeClasses || []).includes(base))) return false;
+    return true;
+  }
   const elementBonus = D.elementBonus.elements;
 
   global.GameDB = {
     STAT_KEYS, STAT_LABELS, CATEGORY_LABELS,
-    weapons, weaponsByCategory, weaponRarity, weaponStars, isEffective, isMarkable, withMark, laguzInfo: D.laguzClasses,
-    classes, classByName, baseClassName, promotionOf, classSkillOf,
-    skills, elementBonus,
+    weapons, weaponRenames, weaponsByCategory, weaponRarity, weaponStars, isEffective, isMarkable, withMark, laguzInfo: D.laguzClasses,
+    classes, classByName, baseClassName, promotionOf, classSkillOf, classMaxOf,
+    skills, elementBonus, skillFits,
   };
 })(window);

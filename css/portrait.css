@@ -1,0 +1,147 @@
+/* =========================================================
+   v1.6.6:スマホ縦向き(幅600px以下)のバトル準備・バトル(手書き)
+   ・横向き用の詰めた見た目は css/portrait_auto.css(tools/build_portrait_css.py が作る)
+   ・ここには縦向きだけの並べ方・手直しを書く。PC・横向きの見た目は変えない
+   ========================================================= */
+
+/* ---- 縦向き用の部品は、ふだん(PC・横向き)は出さない ---- */
+.pt-tabs, .pt-mini, .pt-gear, .pt-wchange, .pt-sheet-title, .pt-sheet-close, .atk-tag { display: none; }
+.start-row { display: contents; }
+
+@media (orientation: portrait) and (max-width: 600px) {
+  /* ---- 共通:「タイトルへ戻る」は左上に小さく。iPhoneの切り欠きをよける ---- */
+  body:has(#screen-prep.active) .topbar .link-btn,
+  body:has(#screen-battle.active) .topbar .link-btn {
+    position: fixed; top: calc(4px + env(safe-area-inset-top)); left: 8px; right: auto; transform: none;
+    font-size: 10px; padding: 1px 10px; z-index: 60;
+  }
+  body:has(#screen-prep.active) #app,
+  body:has(#screen-battle.active) #app {
+    padding: calc(38px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 0 calc(8px + env(safe-area-inset-left));
+  }
+
+  /* =================== バトル準備 =================== */
+  #screen-prep.active { height: auto; padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
+  .pt-tabs { display: flex; gap: 4px; margin: 0 0 6px; }
+  .pt-tab { flex: 1; padding: 6px 4px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+    font-size: 13px; font-weight: bold; line-height: 1.2; }
+  .pt-tab small { display: block; font-size: 10px; font-weight: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt-tab.on { background: #2b3a8c; color: #fff; border-color: var(--gold); }
+  .prep-layout { grid-template-columns: minmax(0, 1fr); height: auto; gap: 6px; }
+  .prep-side .panel { height: auto; }
+  #screen-prep[data-ptab="left"] .prep-side[data-side="right"],
+  #screen-prep[data-ptab="right"] .prep-side[data-side="left"],
+  #screen-prep[data-ptab="vs"] .prep-side { display: none; }
+
+  /* 能力値は2列 */
+  .prep-side .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 14px; }
+  .prep-side .stat { font-size: 13px; line-height: 1.55; }
+  .prep-side .stat-bar { height: 6px; }
+  .prep-side .stat-element { grid-column: 1 / -1; }
+
+  /* 武器は選んだものだけ。「変更」で一覧を開く */
+  .weapon-head { display: flex; align-items: center; }
+  .pt-wchange { display: inline-block; margin-left: auto; font-size: 11px; padding: 1px 10px; border-radius: 10px;
+    border: 1px solid var(--gold); color: var(--gold); background: transparent; }
+  .prep-side:not(.wopen) .weapon-choice:not(.selected) { display: none; }
+  .weapon-list { gap: 4px; }
+  .weapon-choice { padding: 5px 9px; }
+  .weapon-choice .w-name { font-size: 13.5px; }
+  .weapon-choice .w-effect, .weapon-choice:not(.selected) .w-effect { display: block; white-space: normal; font-size: 11px; }
+
+  /* 画面の下に固定:小さな戦闘予測 + ⚙設定・対戦開始 */
+  .prep-center { position: fixed; left: 0; right: 0; top: auto; bottom: 0; z-index: 30; height: auto; min-height: 0;
+    background: rgba(9, 13, 28, .97); border-top: 1px solid var(--gold);
+    padding: 6px calc(10px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left)); gap: 5px; }
+  .pt-mini { display: grid; grid-template-columns: 4.8em repeat(5, minmax(0, 1fr)); gap: 0 2px; text-align: center; font-size: 10.5px; color: var(--muted); }
+  .pt-mini b { font-size: 15px; color: var(--text, #fff); line-height: 1.3; }
+  .pt-mini .x2 { font-size: 9px; }
+  .pt-mini .pm-name { text-align: left; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: center; }
+  .pt-mini .pm-name.l { color: #8fb0ff; }
+  .pt-mini .pm-name.r { color: #ff9aa8; }
+  .start-row { display: flex; gap: 6px; }
+  .pt-gear { display: block; flex: none; width: 60px; padding: 2px; font-size: 11px; line-height: 1.3; }
+  .prep-center .btn-start { flex: 1; font-size: 16px; padding: 10px 0; }
+  .prep-center:has(#battle-options[hidden]) .pt-gear { display: none; }
+  #screen-prep:not([data-ptab="vs"]) #forecast { display: none; }
+  #screen-prep[data-ptab="vs"] .pt-mini { display: none; }
+  /* 対戦タブ:戦闘予測を全部(補正も)見せ、下に固定しない */
+  #screen-prep[data-ptab="vs"] .prep-center { position: static; background: none; border: 0; padding: 0; gap: 6px; }
+  #screen-prep[data-ptab="vs"].active { padding-bottom: 20px; }
+  #screen-prep[data-ptab="vs"] .forecast { flex: none; padding: 8px 12px; }
+  #screen-prep[data-ptab="vs"] .fc-row { line-height: 1.7; }
+  #screen-prep[data-ptab="vs"] .fc-v { font-size: 16px; }
+  #screen-prep[data-ptab="vs"] .fc-k { font-size: 11px; }
+  #screen-prep[data-ptab="vs"] .fc-note { display: block; font-size: 10px; }
+  .tour-info { order: -1; }
+
+  /* ⚙設定:何本先取・スキル抽選などは、下から出るシートにまとめる */
+  .battle-options { display: none; }
+  #screen-prep.pt-set-open .battle-options:not([hidden]) {
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 0;
+    position: fixed; inset: 0; z-index: 70; padding: 0; background: rgba(0, 0, 0, .55); border: 0; border-radius: 0;
+  }
+  #screen-prep.pt-set-open .battle-options > * { background: var(--panel); margin: 0; padding: 8px 16px; }
+  #screen-prep.pt-set-open .pt-sheet-title { display: block; border-top: 2px solid var(--gold); border-radius: 14px 14px 0 0; padding-top: 14px;
+    color: var(--gold); font-size: 15px; font-weight: bold; }
+  #screen-prep.pt-set-open .battle-options .bo-row { flex: none; flex-wrap: wrap; gap: 10px; }
+  #screen-prep.pt-set-open .bo-btn { flex: 1; font-size: 13px; padding: 6px 4px; line-height: 1.4; }
+  #screen-prep.pt-set-open .battle-options .fx-toggle { width: 100%; font-size: 13px; }
+  #screen-prep.pt-set-open .battle-options .fx-switch { transform: none; }
+  #screen-prep.pt-set-open .pt-sheet-close { display: block; padding: 10px 16px calc(18px + env(safe-area-inset-bottom)); }
+  #screen-prep.pt-set-open .pt-sheet-close { font-size: 14px; }
+
+  /* =================== バトル =================== */
+  #screen-battle.active { height: calc(100dvh - 38px - env(safe-area-inset-top)); }
+  /* 1Pが上、ROUND・VSが真ん中、2Pが下 */
+  .arena { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .arena-mid { flex-direction: row; justify-content: center; align-items: baseline; gap: 12px; padding: 1px 0; }
+  .round-label { font-size: 12px; white-space: nowrap; }
+  .round-label b { display: inline; font-size: 20px; margin-left: 3px; }
+  .vs { font-size: 1.3rem; }
+  /* 補正は ±0 以外だけ */
+  .bonus-row { justify-content: flex-start; }
+  .bonus-row span { flex: none; padding: 0 6px; }
+  .bonus-row span:not(.up):not(.down) { display: none; }
+  /* スキルの説明はタップで開く(ⓘ) */
+  #screen-battle .skill-desc { display: none; }
+  #screen-battle .fighter-row { cursor: pointer; }
+  #screen-battle .fighter-row .skills::after { content: "ⓘ"; color: var(--muted); font-size: 13px; margin-left: 2px; align-self: center; }
+  #screen-battle .fighter.desc-open .skill-desc {
+    display: block; position: absolute; left: 8px; right: 8px; top: auto; bottom: 6px; z-index: 6; margin: 0;
+    white-space: normal; overflow: visible; text-overflow: clip; font-size: 11.5px; line-height: 1.45;
+    background: #0d1220; border: 1px solid var(--gold); border-radius: 8px; padding: 6px 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, .6);
+  }
+  #screen-battle .fighter.desc-open .skill-desc br { display: inline; }
+  /* ログを広く */
+  .battle-log { font-size: 12.5px; line-height: 1.5; }
+  /* 攻撃している側の枠が金色に光る */
+  .fighter.attacking { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .fighter.attacking:not(.transformed):not(.raging) { box-shadow: 0 0 18px 3px rgba(255, 200, 80, .5); }
+  .fighter.attacking .atk-tag { display: block; position: absolute; top: -8px; right: 14px; z-index: 4;
+    background: var(--gold); color: #1a1405; font-size: 10px; font-weight: bold; padding: 0 8px; border-radius: 8px; line-height: 1.5; }
+  /* 踏み込みは上下(1Pは下へ、2Pは上へ) */
+  .fighter[data-side="left"].lunge { animation: ptLungeDown .3s ease; }
+  .fighter[data-side="right"].lunge { animation: ptLungeUp .3s ease; }
+  @keyframes ptLungeDown { 50% { transform: translateY(10px); } }
+  @keyframes ptLungeUp { 50% { transform: translateY(-10px); } }
+  /* ダメージを大きく */
+  #screen-battle .float { font-size: 2.4rem; }
+  #screen-battle .float.dmg { font-size: 3.4rem; -webkit-text-stroke: 2px #b3122b; text-shadow: 0 3px 0 #6b0716, 0 0 16px rgba(255, 60, 80, .7); }
+  #screen-battle .float.crit { font-size: 3.8rem; -webkit-text-stroke: 2px #b3122b; }
+  /* 決着:主なボタンを金色で大きく、ほかは小さく横に並べる */
+  .battle-result { left: 8px; right: 8px; transform: none; bottom: calc(8px + env(safe-area-inset-bottom)); padding: 10px 12px; }
+  .result-text { font-size: 20px; }
+  .result-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; flex-wrap: wrap; }
+  .result-buttons .btn { font-size: 11.5px; padding: 6px 2px; white-space: nowrap; }
+  .result-buttons .btn[hidden] { display: none; }
+  #btn-rematch, #btn-tour-next, #btn-arc-next { grid-column: 1 / -1; order: -1; font-size: 15px; padding: 10px 4px;
+    background: linear-gradient(#f2c94c, #c8951e); color: #1a1405; border-color: #ffe08a; }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  /* トーナメント・アーケードの試合の案内は、下の帯の中で1行に詰める */
+  .prep-center .tour-info { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 8px; padding: 3px 6px; }
+  .prep-center .tour-info[hidden] { display: none; }
+  .prep-center .tour-info p { margin: 0; font-size: 10.5px; }
+  .prep-center .tour-info .btn, .prep-center .tour-info .link-btn { font-size: 10px; padding: 1px 8px; }
+}

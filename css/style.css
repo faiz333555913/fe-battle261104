@@ -1022,25 +1022,11 @@ button, .btn, .choice, .link-btn { touch-action: manipulation; -webkit-tap-highl
 }
 
 /* =========================================================
-   v1.3.5:スマホの横画面専用レイアウト(バトル準備・バトルを1画面に収める)
+   v1.3.5:スマホの横画面レイアウト(バトル準備・バトルを1画面に収める)
    横向きで高さ500px以下の画面(スマホの横向き)だけに効く。PC・iPadは変わらない
    ========================================================= */
-.rotate-hint { display: none; }
-
-/* スマホを縦にしてバトル準備・バトルを開いたら「横向きに」 */
-@media (orientation: portrait) and (max-width: 600px) {
-  body:has(#screen-prep.active) .rotate-hint,
-  body:has(#screen-battle.active) .rotate-hint {
-    display: grid; place-items: center; position: fixed; inset: 0; z-index: 300;
-    background: rgba(9, 13, 24, .96); text-align: center; padding: 24px;
-  }
-  .rotate-box p { font-size: 1.3rem; margin: 18px 0 6px; }
-  .rotate-box b { color: var(--gold); }
-  .rotate-box small { color: var(--muted); }
-  .rotate-icon { width: 54px; height: 90px; margin: 0 auto; border: 3px solid var(--gold); border-radius: 10px; position: relative; animation: rotatephone 2.2s ease-in-out infinite; }
-  .rotate-icon span { position: absolute; left: 50%; bottom: 5px; width: 14px; height: 3px; margin-left: -7px; border-radius: 2px; background: var(--gold); }
-  @keyframes rotatephone { 0%, 25% { transform: rotate(0); } 55%, 85% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
-}
+/* v1.6.6:スマホ縦向きでもバトル準備・バトルができるようにしたので、「横向きにしてください」の案内は削除。
+   縦向きの見た目は css/portrait_auto.css(横向き用から自動で作る)と css/portrait.css(縦向きだけの手直し) */
 
 @media (orientation: landscape) and (max-height: 500px) {
   body { font-size: 11px; line-height: 1.3; }
@@ -1824,3 +1810,263 @@ table.stats thead th { white-space: nowrap; }
   .arc-ladder small { display: none; }
   .arc-skill { padding: 6px 8px; }
 }
+
+/* =================== v1.6.1 =================== */
+/* アーケードの準備:モード・キャラ・選んだキャラの能力値と武器(3列。アイクモードはキャラの一覧なし) */
+.tsetup.asetup { grid-template-columns: 300px minmax(0, 1fr) minmax(300px, 400px); }
+.tsetup.asetup.ike { grid-template-columns: 300px minmax(0, 520px); justify-content: center; }
+.asetup .ts-chars { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.as-detail .side-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.as-detail .side-label { margin: 0; color: var(--gold); font-weight: bold; }
+.as-detail .side-label small { margin-left: 8px; color: var(--muted); font-weight: normal; font-size: .75rem; }
+.as-detail .stat-grid { margin: 8px 0 4px; }
+.as-detail .weapon-head { margin: 10px 0 6px; }
+.as-detail .weapon-cards { display: grid; gap: 6px; }
+.as-detail-empty { margin: 30px 0; text-align: center; }
+.arc-item { display: flex; justify-content: center; margin: 0 0 10px; }
+.arc-item .weapon-card { min-width: 280px; }
+.arc-ladder.ike { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+/* v1.6.2:21体目(アシュナード)は、3段目に横いっぱいで出す */
+.arc-ladder.ike li.bonus { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.arc-ladder.ike li.bonus small { min-height: 0; font-size: .8rem; }
+@media (max-width: 1100px) {
+  .tsetup.asetup { grid-template-columns: 300px minmax(0, 1fr); }
+  .tsetup.asetup .as-detail { grid-column: 2; }
+  .tsetup.asetup.ike .as-detail { grid-column: auto; }
+}
+@media (max-width: 760px) {
+  .tsetup.asetup, .tsetup.asetup.ike { grid-template-columns: 1fr; }
+  .tsetup.asetup .as-detail { grid-column: auto; }
+  .arc-ladder.ike { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .tsetup.asetup { grid-template-columns: 240px minmax(0, 1fr) minmax(250px, 300px); }
+  .tsetup.asetup.ike { grid-template-columns: 260px minmax(0, 1fr); }
+  .tsetup.asetup .as-detail { grid-column: auto; padding: 8px 10px; }
+  .asetup .ts-chars { grid-template-columns: 1fr; max-height: 62vh; }
+  .as-detail .char-head { margin-bottom: 0; }
+  .as-detail .weapon-card { padding: 4px 8px; }
+}
+
+/* 先攻・後攻を選ぶ権利(アーケード) */
+.roulette-choice-text { margin: 14px 0 0; color: var(--fg); font-size: 1rem; }
+.roulette-choice { display: flex; gap: 14px; justify-content: center; margin-top: 12px; }
+.roulette-choice .btn { min-width: 150px; }
+
+/* 会話・暗転・STAGE CLEAR / GAME OVER */
+.overlay.talk { background: transparent; backdrop-filter: none; z-index: 120; display: block; cursor: pointer; }
+.overlay.talk.hide { visibility: hidden; }
+.talk-dark { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity .6s ease; pointer-events: none; }
+.talk-dark.on { opacity: 1; }
+.talk-dark.on.dim { opacity: .72; }
+/* v1.6.2:画面の下の端(バトルのログ・ボタンと重なっていた)→ 画面のまん中(2人の間)に移動 */
+.talk-box { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(760px, 92vw); min-height: 120px; padding: 22px 26px 18px;
+  background: linear-gradient(180deg, rgb(29, 42, 102), rgb(20, 29, 74)); border: 2px solid var(--gold-soft); border-radius: 10px; box-shadow: 0 8px 30px rgba(0, 0, 0, .6); }
+.talk-box[hidden] { display: none; }
+.talk-name { position: absolute; top: -16px; left: 18px; padding: 3px 14px; background: #141d4a; border: 1px solid var(--gold); border-radius: 6px; color: var(--gold); font-weight: bold; letter-spacing: .1em; }
+.talk-name[hidden] { display: none; }
+.talk-text { margin: 0; white-space: pre-line; font-size: 1.1rem; line-height: 1.75; color: #fff; }
+.talk-text.in { animation: talk-in .35s ease; }
+@keyframes talk-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.talk-next { position: absolute; right: 16px; bottom: 8px; color: var(--gold); font-style: normal; font-size: .8rem; animation: talk-blink 1s steps(2) infinite; }
+@keyframes talk-blink { 50% { opacity: 0; } }
+.talk-skip { position: absolute; top: 14px; right: 14px; z-index: 2; }
+.talk-skip[hidden] { display: none; }
+.talk-banner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; pointer-events: none; }
+.talk-banner[hidden] { display: none; }
+.talk-banner b { font-size: clamp(2.4rem, 8vw, 5rem); letter-spacing: .14em; font-family: Georgia, "Times New Roman", serif; animation: banner-in 1.1s cubic-bezier(.2, .9, .3, 1); }
+.talk-banner small { font-size: 1.05rem; color: #fff; animation: banner-sub 1.6s ease; }
+.talk-banner em { font-style: normal; font-size: .75rem; color: var(--muted); margin-top: 18px; animation: banner-sub 2.2s ease; }
+.talk-banner.clear b { color: #ffe9a0; text-shadow: 0 0 18px rgba(255, 200, 60, .9), 0 0 50px rgba(255, 170, 40, .5); }
+.talk-banner.over b { color: #e8433f; text-shadow: 0 0 16px rgba(255, 40, 40, .55); letter-spacing: .22em; }
+@keyframes banner-in { from { opacity: 0; transform: scale(1.35); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes banner-sub { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }
+@media (orientation: landscape) and (max-height: 500px) {
+  .talk-box { min-height: 84px; padding: 14px 18px 12px; }
+  .talk-text { font-size: .92rem; line-height: 1.55; }
+  .roulette-choice-text { margin-top: 6px; font-size: .85rem; }
+  .roulette-choice { margin-top: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .talk-text.in, .talk-banner b, .talk-banner small, .talk-banner em, .talk-next { animation: none; }
+  .talk-dark { transition: none; }
+}
+#as-mode .bo-btn { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
+.overlay.talk[hidden] { display: none; }
+.roulette-choice[hidden], .roulette-choice-text[hidden] { display: none; }
+/* v1.6.1:天使の羽衣 */
+.arc-boost { display: flex; justify-content: center; align-items: baseline; gap: 12px; margin: 4px 0 12px; font-size: 1.1rem; }
+.arc-boost span { color: var(--gold); }
+.arc-boost b { font-size: 1.6rem; }
+.arc-boost b.up { color: #7dff9a; text-shadow: 0 0 10px rgba(120, 255, 150, .5); }
+/* v1.6.1:手放す剣を選ぶ */
+.arc-discards { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 4px 0 12px; }
+.arc-discard { background: none; border: 2px solid transparent; border-radius: 10px; padding: 2px; cursor: pointer; color: inherit; font: inherit; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+.arc-discard small { color: var(--gold); font-size: .75rem; padding-left: 4px; }
+.arc-discard:hover { border-color: rgba(255, 255, 255, .25); }
+.arc-discard.on { border-color: #ff6b6b; box-shadow: 0 0 10px rgba(255, 107, 107, .45); }
+.arc-discard .weapon-card, .arc-discard > div { pointer-events: none; }
+
+/* =========================================================
+   v1.6.4 で追加・変更した部分
+   ========================================================= */
+/* アイクモード:ドーピングアイテムを選ぶ */
+.arc-dope .dope-name { font-size: 1.05rem; color: var(--gold); }
+.arc-dope .as-desc b.up { color: #7dff9a; }
+/* 2つ目・3つ目のスキルを追加できるときのお知らせ */
+.arc-add-notice { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; padding: 10px 14px; border: 2px solid var(--gold); border-radius: 8px;
+  background: linear-gradient(180deg, rgba(216, 183, 90, .28), rgba(216, 183, 90, .08)); box-shadow: 0 0 16px rgba(216, 183, 90, .35); animation: add-notice 1.6s ease-in-out infinite alternate; }
+.arc-add-notice b { color: #ffe9a0; font-size: 1.15rem; letter-spacing: .06em; }
+.arc-add-notice span { font-size: .9rem; color: #fff; }
+@keyframes add-notice { from { box-shadow: 0 0 6px rgba(216, 183, 90, .25); } to { box-shadow: 0 0 22px rgba(255, 210, 90, .6); } }
+.talk-banner.skillup b { color: #bff3ff; text-shadow: 0 0 18px rgba(90, 200, 255, .9), 0 0 50px rgba(60, 140, 255, .5); }
+/* セリフは3行まで(箱の高さを3行ぶんにそろえる) */
+.talk-box { min-height: calc(1.1rem * 1.75 * 3 + 40px); }
+@media (orientation: landscape) and (max-height: 500px) { .talk-box { min-height: calc(.92rem * 1.55 * 3 + 26px); } }
+/* アシュナードの消滅:赤黒い光に包まれ、灰のように崩れて消える */
+.fighter.vanish-fx { animation: vanish 2.6s ease forwards; }
+@keyframes vanish {
+  0% { filter: grayscale(.6) brightness(.7); opacity: 1; }
+  25% { filter: brightness(2.4) sepia(1) hue-rotate(-30deg) saturate(3); box-shadow: 0 0 40px #ff3a2a, inset 0 0 40px #ff3a2a; }
+  60% { filter: brightness(.6) grayscale(1); opacity: .7; }
+  100% { filter: brightness(.3) grayscale(1) blur(2px); opacity: 0; }
+}
+.fighter.vanished { opacity: 0; }
+.vanish-ash { position: absolute; inset: 0; pointer-events: none; }
+.vanish-ash i { position: absolute; width: 7px; height: 7px; border-radius: 2px; background: #2a1414; box-shadow: 0 0 6px #ff4a2a; opacity: 0; animation: ash-rise 2.2s ease-out forwards; }
+@keyframes ash-rise { 0% { opacity: 0; transform: none; } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), -140px) rotate(160deg) scale(.4); } }
+
+/* ---- v1.6.4:奥義(流星・月光・太陽・天空)の演出 ---- */
+/* 背景:アリーナに重ねる(screen で重ねるので、キャラ枠は見えたまま) */
+.ougi-bg { position: absolute; inset: -6px; z-index: 15; pointer-events: none; overflow: hidden; border-radius: 14px; mix-blend-mode: screen; animation: ob-in .45s ease forwards; }
+.ougi-bg.out { animation: ob-out .5s ease forwards; }
+.ougi-bg i, .ougi-bg b { position: absolute; display: block; }
+.ougi-bg .ob-glow { inset: 0; }
+@keyframes ob-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ob-out { from { opacity: 1; } to { opacity: 0; } }
+/* 流星:緑の星が降りそそぐ */
+.ougi-bg.meteor .ob-glow { background: radial-gradient(ellipse at 50% 40%, rgba(40, 200, 90, .55), rgba(0, 70, 30, .5) 60%, rgba(0, 30, 10, .4)); }
+.ougi-bg.meteor .ob-star { width: 26px; height: 26px; transform: scale(var(--s, 1)); background: #b8ffcb;
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  filter: drop-shadow(0 0 6px #3dff7a); animation: ob-fall 1.1s linear infinite; }
+.ougi-bg.meteor .ob-star::after { content: ""; position: absolute; left: 50%; bottom: 60%; width: 3px; height: 80px; transform: translateX(-50%) rotate(30deg); transform-origin: bottom; background: linear-gradient(0deg, rgba(120, 255, 160, .9), transparent); }
+@keyframes ob-fall { 0% { opacity: 0; translate: 0 0; } 15% { opacity: 1; } 100% { opacity: 0; translate: -120px 520px; } }
+/* 月光:青い月と、さしこむ光 */
+.ougi-bg.luna .ob-glow { background: radial-gradient(ellipse at 50% 25%, rgba(80, 140, 255, .55), rgba(10, 30, 110, .55) 65%, rgba(0, 8, 40, .5)); }
+.ougi-bg.luna .ob-moon { left: 50%; top: 6%; width: 150px; height: 150px; margin-left: -75px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #f4f8ff, #b9d2ff 55%, #6d9bff 75%, transparent 76%); box-shadow: 0 0 60px #8fb6ff, 0 0 120px rgba(80, 140, 255, .8); animation: ob-moon 1.8s ease forwards; }
+.ougi-bg.luna .ob-ray { left: 50%; top: 0; width: 70px; height: 130%; margin-left: -35px; transform-origin: top center; transform: rotate(-18deg);
+  background: linear-gradient(180deg, rgba(180, 210, 255, .55), transparent 80%); filter: blur(4px); animation: ob-ray 2.4s ease-in-out infinite alternate; }
+.ougi-bg.luna .ob-ray.r2 { transform: rotate(0deg); width: 110px; margin-left: -55px; animation-delay: .3s; }
+.ougi-bg.luna .ob-ray.r3 { transform: rotate(18deg); animation-delay: .6s; }
+@keyframes ob-moon { from { opacity: 0; transform: translateY(30px) scale(.8); } to { opacity: 1; transform: none; } }
+@keyframes ob-ray { from { opacity: .35; } to { opacity: .9; } }
+/* 太陽:黄色い太陽と、回る光 */
+.ougi-bg.sol .ob-glow { background: radial-gradient(ellipse at 50% 30%, rgba(255, 220, 70, .6), rgba(200, 110, 0, .5) 60%, rgba(70, 30, 0, .45)); }
+.ougi-bg.sol .ob-sun { left: 50%; top: 8%; width: 140px; height: 140px; margin-left: -70px; border-radius: 50%;
+  background: radial-gradient(circle, #fffbe0, #ffe06a 45%, #ffae1a 70%, transparent 72%); box-shadow: 0 0 70px #ffd23f, 0 0 140px rgba(255, 160, 30, .8); animation: ob-moon 1.2s ease forwards; }
+.ougi-bg.sol .ob-sunrays { left: 50%; top: calc(8% + 70px); width: 900px; height: 900px; margin: -450px 0 0 -450px; border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 230, 120, .18) 0 6deg, transparent 6deg 18deg); animation: ob-spin 6s linear infinite; }
+@keyframes ob-spin { to { transform: rotate(360deg); } }
+/* 天空:夜明けの空に、太陽と月の紋章と、天に昇る光の柱(アイクがラグネルとともに跳び上がる) */
+.ougi-bg.aether .ob-glow { background: linear-gradient(180deg, rgba(20, 50, 160, .65), rgba(70, 120, 230, .45) 45%, rgba(255, 190, 60, .5)); }
+.ougi-bg.aether .ob-emblem { left: 50%; top: 6%; width: 140px; height: 140px; margin-left: -70px; animation: ob-moon 1s ease forwards; }
+.ougi-bg.aether .ob-emblem b { inset: 0; border-radius: 50%; }
+.ougi-bg.aether .ob-emblem .sun { background: radial-gradient(circle, #fffbe0, #ffd84a 50%, transparent 70%); clip-path: inset(0 50% 0 0); box-shadow: 0 0 60px #ffcf3f; }
+.ougi-bg.aether .ob-emblem .moon { background: radial-gradient(circle, #f4f8ff, #9fc0ff 50%, transparent 70%); clip-path: inset(0 0 0 50%); }
+.ougi-bg.aether .ob-pillar { top: -10%; bottom: -10%; width: 120px; filter: blur(6px);
+  background: linear-gradient(90deg, transparent, rgba(255, 240, 180, .85), rgba(160, 200, 255, .85), transparent); animation: ob-pillar 1.4s ease-in-out infinite alternate; }
+.ougi-bg.aether.left .ob-pillar { left: 18%; }
+.ougi-bg.aether.right .ob-pillar { right: 18%; }
+.ougi-bg.aether .ob-spark { bottom: -10px; width: 6px; height: 6px; border-radius: 50%; background: #fff3c4; box-shadow: 0 0 8px #ffd84a; animation: ob-rise 1.3s ease-in infinite; }
+@keyframes ob-pillar { from { opacity: .45; transform: scaleX(.8); } to { opacity: 1; transform: scaleX(1.1); } }
+@keyframes ob-rise { 0% { opacity: 0; transform: none; } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-460px); } }
+/* 奥義の帯の色(流星=緑、月光=青、太陽=黄、天空=青と金) */
+.fx-ougi.ob-meteor, .fx-ougi.ob-meteor.right { background: linear-gradient(90deg, transparent, rgba(30, 150, 70, .92) 20%, rgba(30, 150, 70, .92) 80%, transparent); border-color: #9dffb9; }
+.fx-ougi.ob-luna, .fx-ougi.ob-luna.right { background: linear-gradient(90deg, transparent, rgba(40, 80, 200, .92) 20%, rgba(40, 80, 200, .92) 80%, transparent); border-color: #b9d2ff; }
+.fx-ougi.ob-sol, .fx-ougi.ob-sol.right, .fx-ougi.ob-sol.heal { background: linear-gradient(90deg, transparent, rgba(210, 140, 10, .94) 20%, rgba(210, 140, 10, .94) 80%, transparent); border-color: #ffe9a0; }
+.fx-ougi.ob-aether, .fx-ougi.ob-aether.right, .fx-ougi.ob-aether.heal { background: linear-gradient(90deg, transparent, rgba(40, 70, 190, .94) 20%, rgba(200, 140, 30, .94) 80%, transparent); border-color: #ffe9a0; letter-spacing: .3em; }
+/* キャラの動き */
+.fighter.rise-up { animation: rise-up .3s ease-out; }
+@keyframes rise-up { 0% { transform: none; } 60% { transform: translateY(-22px); } 100% { transform: translateY(-10px); } }
+.fighter.charge { animation: charge .7s ease-in forwards; }
+@keyframes charge { 0% { box-shadow: none; transform: none; } 100% { box-shadow: 0 0 0 3px #b8ffcb, 0 0 34px #3dff7a; transform: translateY(-14px) scale(1.02); } }
+.fighter.charge-luna { animation: charge-luna .9s ease-in forwards; }
+@keyframes charge-luna { 0% { box-shadow: none; filter: none; } 100% { box-shadow: 0 0 0 3px #cfe0ff, 0 0 44px #5d8dff; filter: brightness(1.25) saturate(1.2); } }
+.fighter.dive-down { animation: dive-down .22s ease-in; }
+@keyframes dive-down { 0% { transform: translateY(-34px) scale(1.04); } 100% { transform: none; } }
+.fighter.leap { animation: leap .56s cubic-bezier(.2, .8, .3, 1) forwards; }
+@keyframes leap { 0% { transform: none; } 100% { transform: translateY(-40px) scale(1.03); box-shadow: 0 30px 40px rgba(0, 0, 0, .45), 0 0 30px rgba(255, 220, 120, .7); } }
+.fighter.hover { transform: translateY(-40px) scale(1.03); box-shadow: 0 30px 40px rgba(0, 0, 0, .45), 0 0 40px rgba(140, 180, 255, .9); transition: box-shadow .4s; }
+.fighter.sol-glow { animation: sol-glow 1.1s ease; }
+@keyframes sol-glow { 0% { box-shadow: 0 0 0 0 #fff; filter: brightness(2.2) sepia(.6); } 40% { box-shadow: 0 0 0 6px #ffe06a, 0 0 60px #ffcf3f; filter: brightness(1.5) sepia(.3); } 100% { box-shadow: none; filter: none; } }
+.fighter.leap.sol-glow { animation: leap .01s forwards, sol-glow 1s ease; }
+/* 斬撃の色・向き */
+.impact.meteor .slash { background: linear-gradient(90deg, transparent, #b8ffcb 35%, #fff 50%, #b8ffcb 65%, transparent); box-shadow: 0 0 14px #3dff7a, 0 0 28px #1a9a4a; }
+.impact.meteor .burst { border-color: #9dffb9; }
+.impact.rise .slash { --r: -78deg; }
+.impact.rise .slash.s2 { --r: -62deg; }
+.impact.down .slash { --r: 84deg; width: 95%; height: 8px; }
+.impact.down .slash.s2 { --r: 96deg; }
+.impact.down .burst { width: 50px; height: 50px; }
+.impact.luna .slash { height: 9px; width: 95%; background: linear-gradient(90deg, transparent, #cfe0ff 30%, #fff 50%, #cfe0ff 70%, transparent); box-shadow: 0 0 18px #6d9bff, 0 0 40px #2f5dff; border-radius: 50%; }
+.impact.luna .burst { border-color: #b9d2ff; width: 46px; height: 46px; }
+.impact.sol .slash { height: 7px; background: linear-gradient(90deg, transparent, #ffe06a 30%, #fff 50%, #ffe06a 70%, transparent); box-shadow: 0 0 16px #ffcf3f, 0 0 34px #ff9a1a; }
+.impact.sol .burst { border-color: #ffe06a; }
+.impact.aether .slash { height: 8px; width: 95%; background: linear-gradient(90deg, transparent, #ffe9a0 30%, #fff 50%, #b9d2ff 70%, transparent); box-shadow: 0 0 18px #ffd84a, 0 0 40px #5d8dff; }
+.impact.aether .burst { border-color: #fff3c4; width: 50px; height: 50px; }
+/* 太陽の回復:黄色い閃光の輪と、光の粒 */
+.sun-burst { position: absolute; inset: 0; pointer-events: none; display: grid; place-items: center; }
+.sun-burst .sb-ring { grid-area: 1 / 1; width: 40px; height: 40px; border-radius: 50%; border: 4px solid #ffe06a; box-shadow: 0 0 20px #ffcf3f; opacity: 0; animation: sb-ring .9s ease-out forwards; }
+.sun-burst .sb-ring.r2 { animation-delay: .18s; border-color: #fff3c4; }
+.sun-burst .sb-p { position: absolute; bottom: 10%; width: 6px; height: 6px; border-radius: 50%; background: #fff3a0; box-shadow: 0 0 8px #ffd84a; opacity: 0; animation: ob-rise 1.1s ease-out forwards; }
+@keyframes sb-ring { 0% { opacity: 1; transform: scale(.3); } 100% { opacity: 0; transform: scale(7); } }
+.float.big-heal.sun { color: #fff0a0; text-shadow: 0 2px 0 #5a3a00, 0 0 16px rgba(255, 210, 60, .95); }
+@media (prefers-reduced-motion: reduce) {
+  .ougi-bg .ob-star, .ougi-bg .ob-sunrays, .ougi-bg .ob-spark, .ougi-bg .ob-ray, .ougi-bg .ob-pillar { animation: none; }
+}
+@media (max-width: 600px), (orientation: landscape) and (max-height: 500px) {
+  .ougi-bg.luna .ob-moon, .ougi-bg.sol .ob-sun, .ougi-bg.aether .ob-emblem { width: 80px; height: 80px; margin-left: -40px; }
+  .fighter.leap, .fighter.hover { transform: translateY(-16px); }
+  @keyframes leap { 0% { transform: none; } 100% { transform: translateY(-16px); } }
+}
+
+/* ---- v1.6.4:データ集 ---- */
+.data-book { max-width: 1100px; }
+.data-tabs { gap: 8px; }
+.data-tab, .data-chip { font: inherit; cursor: pointer; color: var(--fg); background: #141b33; border: 1px solid var(--line); border-radius: 999px; padding: 4px 16px; }
+.data-tab:hover, .data-chip:hover { border-color: var(--gold); }
+.data-tab.on, .data-chip.on { color: #1a1406; background: var(--gold); border-color: var(--gold); font-weight: bold; }
+.data-filter { padding: 8px 12px; }
+.data-filter[hidden] { display: none; }
+.data-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.data-chip { padding: 3px 12px; font-size: .9rem; }
+.data-body h3 small { margin-left: 10px; font-size: .8rem; color: var(--muted); font-weight: normal; }
+.data-note { font-size: .88rem; color: var(--muted); }
+.data-scroll { overflow-x: auto; margin-top: 8px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: .88rem; white-space: nowrap; }
+.data-table th, .data-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: center; }
+.data-table th { color: var(--gold); font-weight: normal; position: sticky; top: 0; background: var(--panel); }
+.data-table .l { text-align: left; }
+.data-table tbody tr:hover { background: rgba(216, 183, 90, .08); }
+.data-table td.star { color: var(--gold); letter-spacing: -.05em; }
+.data-table td.eff { white-space: normal; min-width: 220px; color: #cfd6ee; }
+.data-tag { display: inline-block; margin-left: 6px; padding: 0 6px; font-size: .72rem; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); vertical-align: middle; }
+.data-tag.forge { color: #7dee9e; border-color: rgba(125, 238, 158, .5); }
+.skill-chip.mini { font-size: .7rem; padding: 0 6px; margin-left: 6px; }
+.data-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-top: 8px; }
+.data-skill { padding: 8px 10px; background: #141b33; border: 1px solid var(--line); border-radius: 8px; }
+.data-skill .ds-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.data-skill .ds-top .data-tag { margin-left: 0; }
+.data-skill p { margin: 6px 0 0; font-size: .88rem; line-height: 1.6; }
+@media (max-width: 600px), (orientation: landscape) and (max-height: 500px) {
+  .data-skills { grid-template-columns: 1fr; }
+  .data-table { font-size: .78rem; }
+}
+
+/* =========================================================
+   v1.6.5 で追加した部分
+   ========================================================= */
+/* 『盗む』のカットイン:盗んだ物の名前 */
+.fx-skill em { display: block; font-style: normal; font-size: .85rem; letter-spacing: .15em; color: #fff3c4; }
+@media (max-height: 500px) { .fx-skill em { font-size: .65rem; } }

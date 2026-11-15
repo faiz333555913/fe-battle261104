@@ -33,8 +33,110 @@
     if (name === "asetup") renderArcSetup();
     if (name === "arcade") renderArcade();
     if (name === "howto") $("#screen-howto").scrollTop = 0;
+    if (name === "data") renderData(); // v1.6.4
     window.scrollTo(0, 0);
   }
+
+  // ================= v1.6.4:データ集(武器・スキル・職業・ラグズ・属性) =================
+  // 中身はすべて data/*.json(GameDB)と config.js から作る(数値を変えれば、データ集も変わる)
+  const dataView = { tab: "weapon", weapon: "sword", cls: "base", laguz: "base", skill: "all" };
+  const STAT_HEAD = (keys) => keys.map((k) => `<th>${DB.STAT_LABELS[k]}</th>`).join("");
+  const STAT_KEYS_CON = DB.STAT_KEYS.concat(["con"]);
+  function dataFilterHtml(key, items) {
+    return `<div class="data-chips" data-key="${key}">${items.map(([v, label]) =>
+      `<button type="button" class="data-chip${dataView[key] === v ? " on" : ""}" data-val="${UI.esc(v)}">${UI.esc(label)}</button>`).join("")}</div>`;
+  }
+  // スキルの「出る相手・条件」の札
+  function skillTags(s) {
+    const tags = [];
+    if (s.bossOnly) tags.push("ボス専用");
+    else if (s.classOnly) {
+      const who = Object.entries(C.classSkills || {}).filter(([, n]) => n === s.name).map(([c]) => c);
+      tags.push(`兵種スキル:${who.join("・")}`);
+    }
+    if (C.ougiSkills.includes(s.name)) tags.push("奥義");
+    if (s.rare) tags.push("レア");
+    // v1.6.5:「◯◯だけ」の「だけ」を削除(ガトー指示)
+    if (s.magicOnly) tags.push("魔法を使うキャラ");
+    if (s.beorcOnly) tags.push("ベオク");
+    if (s.onlyClasses) tags.push(`${s.onlyClasses.join("・")}`);
+    if (s.laguzOnly) tags.push(s.excludeClasses ? `${s.excludeClasses.join("・")}以外のラグズ` : "ラグズ");
+    const weapons = Object.values(DB.weapons).filter((w) => w.weaponSkill === s.name).map((w) => w.name);
+    if (weapons.length) tags.push(`武器:${weapons.join("・")}`);
+    return tags;
+  }
+  function renderData() {
+    const tab = dataView.tab;
+    $$("#screen-data .data-tab").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+    const filter = $("#data-filter"), body = $("#data-body");
+    let f = "", html = "";
+    if (tab === "weapon") {
+      const cats = Object.keys(DB.CATEGORY_LABELS).map((k) => [k, DB.CATEGORY_LABELS[k]]);
+      f = dataFilterHtml("weapon", cats);
+      const list = Object.values(DB.weapons).filter((w) => w.category === dataView.weapon);
+      html = `<h3>武器:${UI.esc(DB.CATEGORY_LABELS[dataView.weapon])}<small>${list.length}種類</small></h3>
+        <p class="data-note">★はレア度(★が多いほど出にくい)。◆はオリジナル武器、「専用」はキャラ作成では出ない武器です。${dataView.weapon === "laguz" ? "化身前は威力0です。" : ""}</p>
+        <div class="data-scroll"><table class="data-table weapon-table"><thead><tr><th class="l">名前</th><th>★</th><th>威力</th><th>命中</th><th>必殺</th><th>重さ</th><th class="l">効果</th></tr></thead><tbody>
+        ${list.map((w) => `<tr><td class="l"><b>${UI.esc(w.name)}</b>${w.custom ? '<span class="w-custom" title="オリジナル武器">◆</span>' : ""}${w.exclusive ? '<span class="data-tag">専用</span>' : ""}${w.isMagic && !C.magicCategories.includes(w.category) ? '<span class="data-tag">魔</span>' : ""}</td>
+          <td class="star">${DB.weaponStars(w) ? "★".repeat(DB.weaponStars(w)) : "-"}</td><td>${w.might}</td><td>${w.hit}</td><td>${w.crit}</td><td>${w.weight}</td>
+          <td class="l eff">${UI.esc(UI.weaponEffect(w) || "")}${DB.isMarkable(w) ? '<span class="data-tag forge">錬成の対象</span>' : ""}</td></tr>`).join("")}
+        </tbody></table></div>`;
+    } else if (tab === "skill") {
+      f = dataFilterHtml("skill", [["all", "すべて"], ["draw", "抽選に出る"], ["ougi", "奥義"], ["class", "兵種・ボス"]]);
+      const all = DB.skills.filter((s) => {
+        if (dataView.skill === "draw") return !s.classOnly;
+        if (dataView.skill === "ougi") return C.ougiSkills.includes(s.name);
+        if (dataView.skill === "class") return !!s.classOnly;
+        return true;
+      });
+      html = `<h3>スキル<small>${all.length}種類</small></h3>
+        <p class="data-note">多くのスキルは、技の数値%の確率で発動します。抽選のスキルは、対戦のはじめにルーレットで1人1つ決まります。</p>
+        <div class="data-skills">${all.map((s) => `<div class="data-skill"><div class="ds-top">${s.classOnly && !s.bossOnly ? `<span class="skill-chip class-skill">${UI.esc(s.name)}</span>` : UI.skillChip(s.name, false)}${skillTags(s).map((t) => `<span class="data-tag">${UI.esc(t)}</span>`).join("")}</div>
+          <p>${UI.esc(s.description)}</p></div>`).join("")}</div>`;
+    } else if (tab === "class") {
+      f = dataFilterHtml("cls", [["base", "基本値(Lv1)"], ["growth", "成長率(%)"], ["max", "上限"]]);
+      const list = DB.classes.filter((c) => c.race === "ベオク");
+      const val = (c, k) => (k === "con" ? c.con : dataView.cls === "growth" ? c.growth[k] : dataView.cls === "max" ? c.max[k] : c.base[k]);
+      const keys = dataView.cls === "base" ? STAT_KEYS_CON : DB.STAT_KEYS;
+      html = `<h3>職業(ベオク)<small>${list.length}種類</small></h3>
+        <p class="data-note">キャラ作成では、職業の基本値に個人差(0〜2)を足し、成長率でLv20まで育ちます。エリート・アーケードでは右の上級職にクラスチェンジします。</p>
+        <div class="data-scroll"><table class="data-table"><thead><tr><th class="l">職業</th><th>移動</th><th class="l">武器</th>${STAT_HEAD(keys)}<th class="l">上級職</th></tr></thead><tbody>
+        ${list.map((c) => { const p = DB.promotionOf(c.name); const cs = DB.classSkillOf(c.name); return `<tr><td class="l"><b>${UI.esc(c.name)}</b>${cs ? `<span class="skill-chip class-skill mini">${UI.esc(cs)}</span>` : ""}</td><td>${UI.esc(c.moveType)}</td>
+          <td class="l">${c.weaponCategories.map((k) => DB.CATEGORY_LABELS[k]).join("・")}</td>${keys.map((k) => `<td>${val(c, k)}</td>`).join("")}<td class="l">${p ? UI.esc(p.name) : "-"}</td></tr>`; }).join("")}
+        </tbody></table></div>`;
+    } else if (tab === "laguz") {
+      f = dataFilterHtml("laguz", [["base", "化身前の基本値"], ["transform", "化身で上がる分"], ["growth", "成長率(%)"]]);
+      const list = DB.classes.filter((c) => c.race === "ラグズ" && !c.banned);
+      const keys = dataView.laguz === "base" ? STAT_KEYS_CON : DB.STAT_KEYS;
+      const val = (c, k) => (k === "con" ? c.con : dataView.laguz === "growth" ? c.growth[k] : dataView.laguz === "transform" ? `+${c.transform[k]}` : c.base[k]);
+      html = `<h3>ラグズ<small>${list.length}種類</small></h3>
+        <p class="data-note">ラグズはLv10まで育った状態で生まれます。化身ゲージの初期値は幸運+部族の分。化身前はラウンドごとに+4、ダメージを受けると+${C.laguzGauge.damageGain}。20で化身し、化身中はラウンドの終わりに-${C.laguzGauge.decay}されます。</p>
+        <div class="data-scroll"><table class="data-table"><thead><tr><th class="l">種類</th><th>部族</th><th>移動</th><th>ゲージ</th><th class="l">武器</th>${STAT_HEAD(keys)}</tr></thead><tbody>
+        ${list.map((c) => `<tr><td class="l"><b>${UI.esc(c.name)}</b></td><td>${UI.esc(c.tribe || "")}</td><td>${UI.esc(c.moveType)}</td><td>幸運${c.gaugeBonus ? "+" + c.gaugeBonus : ""}</td>
+          <td class="l">${UI.esc((DB.weapons[c.fixedWeapon] || {}).name || "")}</td>${keys.map((k) => `<td>${val(c, k)}</td>`).join("")}</tr>`).join("")}
+        </tbody></table></div>`;
+    } else {
+      // v1.6.5:属性は入力すべてからランダム。出やすさ(12分のいくつ)を出す
+      const wsum = Object.values(C.elementWeights).reduce((a, b) => a + b, 0);
+      const months = (el) => `${C.elementWeights[el] || 0}/${wsum}`;
+      const sg = (v) => (v ? "+" + v : "-");
+      html = `<h3>属性<small>入力からランダムで決まる</small></h3>
+        <p class="data-note">属性の補正は、いつも能力に足されます。不利な相手(炎→水、水→雷、雷→風、風→炎、光⇔闇)と戦うときは、補正がなくなります。『能力勝負』でも無効になります。</p>
+        <div class="data-scroll"><table class="data-table"><thead><tr><th class="l">属性</th><th>出やすさ</th><th>攻撃</th><th>防御</th><th>命中</th><th>回避</th><th>伸びやすい能力</th><th>苦手な属性</th></tr></thead><tbody>
+        ${Object.entries(DB.elementBonus).map(([el, b]) => `<tr><td class="l">${UI.elementBadge ? UI.elementBadge(el) : UI.esc(el)}</td><td>${months(el)}</td><td>${sg(b.attack)}</td><td>${sg(b.defense)}</td><td>${sg(b.hit)}</td><td>${sg(b.avoid)}</td>
+          <td>${DB.STAT_LABELS[C.elementGrowthBonus[el]] || ""}</td><td>${(C.elementWeakTo[el] || []).join("・") || "なし"}</td></tr>`).join("")}
+        </tbody></table></div>`;
+    }
+    filter.innerHTML = f;
+    filter.hidden = !f;
+    body.innerHTML = html;
+  }
+  $("#screen-data").addEventListener("click", (e) => {
+    const tab = e.target.closest(".data-tab");
+    if (tab) { dataView.tab = tab.dataset.tab; renderData(); return; }
+    const chip = e.target.closest(".data-chip");
+    if (chip) { dataView[chip.closest(".data-chips").dataset.key] = chip.dataset.val; renderData(); }
+  });
 
   // ================= タイトル(v1.4.0) =================
   // PRESS START → 押すと速く点滅 → ゆっくり暗転 → メニューが左右からスライドして中央で止まる
@@ -120,11 +222,17 @@
   function updateArcButton() {
     const n = S.list().filter((c) => !isBanned(c)).length;
     const saved = loadArc();
-    $("#btn-mode-arcade").disabled = n < 1 && !saved;
-    $("#arc-mode-note").textContent = saved ? (saved.done ? "結果を見る" : `続きから(${A_.stageName(saved.stage)})`) : n < 1 ? "キャラが必要です" : "1人で11連戦を勝ち抜く";
+    // v1.6.1:アイクモードはキャラがいなくても遊べる
+    $("#btn-mode-arcade").disabled = false;
+    $("#arc-mode-note").textContent = saved ? (saved.done ? "結果を見る" : `続きから(${A_.isIke(saved) ? "アイク・" : ""}${A_.stageName(saved.stage, saved)})`) : n < 1 ? "アイクモードで遊べる" : "1人で連戦を勝ち抜く";
   }
   $("#btn-battle-mode").addEventListener("click", openModeMenu);
   $("#btn-mode-back").addEventListener("click", closeModeMenu);
+  // v1.6.6:縦向きのバトルでは、スキルの説明はスキルの札をタップすると開く(もう一度タップで閉じる)
+  $("#arena").addEventListener("click", (e) => {
+    const row = e.target.closest(".fighter-row");
+    if (row) row.closest(".fighter").classList.toggle("desc-open");
+  });
   $("#btn-mode-arena").addEventListener("click", () => { if (!modeBusy) { tourMatch = null; goto("prep"); } });
   $("#btn-mode-tour").addEventListener("click", () => {
     if (modeBusy) return;
@@ -457,6 +565,7 @@
   const isBanned = (c) => !!(DB.classByName[c.className] && DB.classByName[c.className].banned);
 
   function renderPrep() {
+    $("#screen-prep").classList.remove("pt-set-open"); // v1.6.6:縦向きの⚙設定は閉じて始める
     const chars = S.list().filter((c) => !isBanned(c));
     $("#prep-empty").hidden = chars.length > 0;
     $("#prep-body").hidden = chars.length === 0;
@@ -469,7 +578,8 @@
       const keep = prep.left && prep.left.charId === me.id && prep.left.arc;
       const w = (keep && prep.left.weaponId) || arcState.weapon;
       prep.left = { charId: me.id, weaponId: me.weapons.includes(w) ? w : me.weapons[0], bio: rollBio(), view: keep ? prep.left.view : "human", skill: null, arc: true };
-      prep.right = { charId: en.id, weaponId: en.weapon, bio: rollBio(), view: "human", skill: null, arc: true };
+      // v1.6.1:なりそこない(v1.6.1 の名前は「なりそこないの赤竜」)はずっと化身しているので、化身後を見せる
+      prep.right = { charId: en.id, weaponId: en.weapon, bio: rollBio(), view: en.alwaysTransformed || en.gaugeStart >= 20 ? "transformed" : "human", skill: null, arc: true };
       renderPrepSides();
       return;
     }
@@ -542,6 +652,9 @@
     return `<div class="skill-pick"><label><span class="sp-k">スキル</span><select class="skill-select" data-side="${side}">${opts}</select></label>
       <p class="sp-desc">${UI.esc(info ? info.description : "")}</p></div>`;
   }
+  // v1.6.1:アイクモードのアイクの祈りは効果が違う
+  const IKE_PRAYER_DESC = "当たればHPが0となる攻撃を受けた時、幸運の確率でHPが1残ります(アイクモード)";
+  const arcSkillDesc = (n, ike) => (ike && n === "祈り" ? IKE_PRAYER_DESC : (UI.skillInfo(n) || {}).description || "");
   // トーナメントの持ち越しスキル(バトル準備で見せる)
   function carrySkillHtml(u) {
     if (arcMatch) {
@@ -549,7 +662,7 @@
       const list = [u.skill, ...(u.extraSkills || [])].filter(Boolean);
       const random = u.side === "left" && arcState.skillMode !== "carry";
       const chips = random ? `<span class="muted">対戦開始のときにルーレットで決まる${arcState.stage === A_.EXTRA ? "(イナ戦は2つ)" : ""}</span>` : list.length ? list.map((n) => UI.skillChip(n, false)).join("") : '<span class="muted">なし</span>';
-      const desc = random ? "" : list.map((n) => { const s = UI.skillInfo(n); return s ? `${UI.esc(n)}:${UI.esc(s.description)}` : ""; }).filter(Boolean).join("<br>");
+      const desc = random ? "" : list.map((n) => { const s = UI.skillInfo(n); return s ? `${UI.esc(n)}:${UI.esc(arcSkillDesc(n, u.side === "left" && A_.isIke(arcState)))}` : ""; }).filter(Boolean).join("<br>");
       return `<div class="skill-pick carry"><span class="sp-k">スキル</span>${chips}${desc ? `<p class="sp-desc">${desc}</p>` : ""}</div>`;
     }
     if (!tourMatch || tourState.skillMode !== "carry") return "";
@@ -597,13 +710,15 @@
           ${UI.weaponLine(w, { tri, effective: eff })}</label>`;
       }).join("");
       const view = char.race === "ラグズ" ? prep[side].view : "transformed";
+      $(`.prep-side[data-side="${side}"]`).classList.toggle("wopen", !!ptWeaponOpen[side]);
+      $(`#pt-name-${side}`).textContent = char.name; // v1.6.6:縦向きのタブに名前
       $(`.prep-side[data-side="${side}"]`).innerHTML = `
         <div class="panel">
           <div class="side-top"><p class="side-label">${side === "left" ? "1P" : "2P"}</p>${formToggle(side, char)}</div>
           <select class="char-select" data-side="${side}" ${tourMatch || arcMatch ? "disabled" : ""}>${options}</select>
           ${UI.fighterHeader(char, { bio: me.bio, hideWeak: true, noIconWeapon: true })}
           ${UI.statGrid(char, { element: true, form: view, foeElement: foe.char.element })}
-          <h4 class="sub weapon-head">この対戦で使う武器<span class="wtype" title="武器の種類">${UI.esc(UI.weaponTypeLabel(char, me.weapon.id))}</span></h4>
+          <h4 class="sub weapon-head">この対戦で使う武器<span class="wtype" title="武器の種類">${UI.esc(UI.weaponTypeLabel(char, me.weapon.id))}</span>${(arcMatch && side === "right") || char.weapons.length < 2 ? "" : `<button type="button" class="pt-wchange" data-side="${side}">${ptWeaponOpen[side] ? "閉じる ▴" : "変更 ▸"}</button>`}</h4>
           <div class="weapon-list">${weapons}</div>
           ${skillPickHtml(side, me)}${carrySkillHtml(me)}
         </div>`;
@@ -663,6 +778,7 @@
       const side = e.target.dataset.side;
       const c = S.find(e.target.value);
       prep[side] = { charId: c.id, weaponId: c.weapons[0], bio: rollBio(), view: "human", skill: null };
+      ptWeaponOpen[side] = false;
       renderPrepSides();
     } else if (e.target.matches(".skill-select")) {
       prep[e.target.dataset.side].skill = e.target.value; // v1.5.0:スキル選択
@@ -671,6 +787,7 @@
       const side = e.target.name.replace("weapon-", "");
       if (arcMatch && side === "right") return; // 敵の武器は変えられない
       prep[side].weaponId = e.target.value;
+      ptWeaponOpen[side] = false; // v1.6.6:縦向きでは、武器を選んだら一覧を閉じる
       if (tourMatch) { tourState.weapons[prep[side].charId] = e.target.value; saveTour(); }
       if (arcMatch) { arcState.weapon = e.target.value; saveArc(); }
       renderPrepSides();
@@ -690,10 +807,11 @@
     const ws = u.weapon.weaponSkill ? UI.skillInfo(u.weapon.weaponSkill) : null;
     const cs = UI.skillInfo(DB.classSkillOf(u.className));
     const parts = [];
-    if (s) parts.push((u.extraSkills && u.extraSkills.length ? `${UI.esc(s.name)}:` : "") + UI.esc(s.description));
+    const ike = !!(u.char && u.char.ike);
+    if (s) parts.push((u.extraSkills && u.extraSkills.length ? `${UI.esc(s.name)}:` : "") + UI.esc(arcSkillDesc(s.name, ike)));
     // v1.6.0:2つ目以降のスキル(アーケード)
-    for (const n of u.extraSkills || []) { const x = UI.skillInfo(n); if (x) parts.push(`${UI.esc(n)}:${UI.esc(x.description)}`); }
-    if (ws) parts.push(`<span class="ws-desc">武器:${UI.esc(ws.description)}</span>`);
+    for (const n of u.extraSkills || []) { const x = UI.skillInfo(n); if (x) parts.push(`${UI.esc(n)}:${UI.esc(arcSkillDesc(n, ike))}`); }
+    if (ws) parts.push(`<span class="ws-desc">武器:${UI.esc(arcSkillDesc(ws.name, ike))}</span>`);
     if (cs) parts.push(`<span class="ws-desc cs-desc">兵種:${UI.esc(cs.name)}(${UI.esc(cs.description)})</span>`);
     return parts.join("<br>");
   }
@@ -740,6 +858,7 @@
       ${bonus("命中", "hit")}
       ${bonus("回避", "avoid")}
       ${bonus("必殺", "crit")}`;
+    if (el.id === "forecast") renderPtMini(L, R, f);
     $$("[data-fk]", el).forEach((n) => {
       const old = before[n.dataset.fk];
       if (old === undefined || old === n.textContent) return;
@@ -747,6 +866,39 @@
       flash(n, up ? "fc-up" : "fc-down");
     });
   }
+
+  // ================= v1.6.6:スマホ縦向きのバトル準備 =================
+  // 1P・2P・対戦(戦闘予測)のタブ、画面の下に固定する小さな戦闘予測、武器の「変更」、⚙設定。
+  // どれも縦向きのときだけ見える(PC・横向きでは CSS で隠している)
+  let ptTab = "left";
+  const ptWeaponOpen = { left: false, right: false };
+  function setPtTab(tab) {
+    ptTab = tab;
+    $("#screen-prep").dataset.ptab = tab;
+    $$("#pt-tabs .pt-tab").forEach((b) => { b.classList.toggle("on", b.dataset.ptab === tab); b.setAttribute("aria-selected", b.dataset.ptab === tab ? "true" : "false"); });
+  }
+  setPtTab("left");
+  $("#pt-tabs").addEventListener("click", (e) => {
+    const b = e.target.closest(".pt-tab");
+    if (b) { setPtTab(b.dataset.ptab); window.scrollTo(0, 0); }
+  });
+  function renderPtMini(L, R, f) {
+    const cell = (v) => `<b>${v}</b>`;
+    $("#pt-mini").innerHTML = `<span></span><span>HP</span><span>威力</span><span>命中</span><span>必殺</span><span>攻速</span>
+      <span class="pm-name l">${UI.esc(L.name)}</span>${cell(L.hp)}${cell(dmgText(f.left))}${cell(f.left.hit)}${cell(f.left.crit)}${cell(f.left.as)}
+      <span class="pm-name r">${UI.esc(R.name)}</span>${cell(R.hp)}${cell(dmgText(f.right))}${cell(f.right.hit)}${cell(f.right.crit)}${cell(f.right.as)}`;
+  }
+  $("#prep-body").addEventListener("click", (e) => {
+    const b = e.target.closest(".pt-wchange");
+    if (!b) return;
+    ptWeaponOpen[b.dataset.side] = !ptWeaponOpen[b.dataset.side];
+    renderPrepSides();
+  });
+  const ptSetting = (open) => $("#screen-prep").classList.toggle("pt-set-open", open);
+  $("#btn-pt-gear").addEventListener("click", () => ptSetting(true));
+  $("#btn-pt-close").addEventListener("click", () => ptSetting(false));
+  // 設定の外側(暗いところ)をタップしても閉じる
+  $("#battle-options").addEventListener("click", (e) => { if (e.target === e.currentTarget && $("#screen-prep").classList.contains("pt-set-open")) ptSetting(false); });
 
   // ================= ルーレット(スキル 3秒 → 先攻・後攻 1秒) =================
   // v1.4.3:ルーレットはタップで飛ばせる(rouletteSkip が true の間は待たない)
@@ -776,7 +928,8 @@
   // keepSkills:スキルはそのまま(抽選しない)。noSkills(v1.4.3):スキル抽選OFF(先攻・後攻だけ)
   // spinSides(v1.6.0):ルーレットを回す側(アーケードは自分だけ。敵のスキルは決まっている)。省略すると両方
   const skillLabel = (u) => [u.skill, ...(u.extraSkills || [])].filter(Boolean).join("・") || "なし";
-  async function roulette(L, R, first, keepSkills, noSkills, spinSides) {
+  // choose(v1.6.1):アーケード。先攻・後攻は「選ぶ権利」を決めて選ぶ(choose が先攻を返す)
+  async function roulette(L, R, first, keepSkills, noSkills, spinSides, choose) {
     const ov = $("#roulette");
     const slots = { left: $('.roulette-slot[data-side="left"]', ov), right: $('.roulette-slot[data-side="right"]', ov) };
     const units = { left: L, right: R };
@@ -814,6 +967,11 @@
       await sleep(900);
     }
 
+    if (choose) {
+      const f = await choose(slots, units);
+      ov.hidden = true;
+      return f;
+    }
     // 先攻・後攻
     $("#roulette-title").textContent = "先攻・後攻";
     for (const side of ["left", "right"]) {
@@ -833,6 +991,100 @@
     }
     await sleep(1000);
     ov.hidden = true;
+    return first;
+  }
+
+  // ---- v1.6.1:アーケードの先攻・後攻(選ぶ権利をルーレットで決める) ----
+  // 待ち伏せ・必ず先攻の武器があるときは、今までどおり(選べない)
+  async function arcChooseFirst(L, R, slots, units, fx) {
+    const choiceText = $("#roulette-choice-text"), choiceBox = $("#roulette-choice");
+    const lp = B.hasSkill(L, R, "待ち伏せ") || L.weapon.alwaysFirst, rp = B.hasSkill(R, L, "待ち伏せ") || R.weapon.alwaysFirst;
+    const reset = () => { for (const side of ["left", "right"]) { slots[side].classList.remove("done", "rare", "first", "second", "lit"); $(".r-skill", slots[side]).textContent = "?"; } };
+    const show = (firstSide) => {
+      for (const side of ["left", "right"]) {
+        const isFirst = side === firstSide;
+        slots[side].classList.remove("lit", "first", "second");
+        slots[side].classList.add(isFirst ? "first" : "second", "done");
+        $(".r-skill", slots[side]).textContent = isFirst ? "先攻" : "後攻";
+      }
+    };
+    reset();
+    if (lp || rp) {
+      const d = B.decideFirst(L, R, battleRng);
+      $("#roulette-title").textContent = "先攻・後攻";
+      show(d.side);
+      choiceText.hidden = false;
+      choiceText.textContent = `${units[d.side].name}が先攻${d.reason}`;
+      await sleep(1400);
+      choiceText.hidden = true;
+      return d;
+    }
+    $("#roulette-title").textContent = "先攻・後攻を選ぶ権利";
+    let lit = "left";
+    if (fx) {
+      await spin(C.firstRouletteMs, () => {
+        lit = lit === "left" ? "right" : "left";
+        for (const side of ["left", "right"]) slots[side].classList.toggle("lit", side === lit);
+      });
+    }
+    const holder = battleRng.next() < 0.5 ? "left" : "right";
+    for (const side of ["left", "right"]) {
+      slots[side].classList.remove("lit");
+      slots[side].classList.toggle("first", side === holder);
+      slots[side].classList.toggle("second", side !== holder);
+      slots[side].classList.add("done");
+      $(".r-skill", slots[side]).textContent = side === holder ? "選ぶ権利!" : "―";
+    }
+    choiceText.hidden = false;
+    let firstSide;
+    if (holder === "left") {
+      choiceText.textContent = `${L.name}が選べます。先攻にしますか?後攻にしますか?`;
+      choiceBox.hidden = false;
+      firstSide = await new Promise((resolve) => {
+        choiceBox.onclick = (e) => {
+          e.stopPropagation();
+          const b = e.target.closest("[data-first]");
+          if (!b) return;
+          choiceBox.onclick = null;
+          resolve(b.dataset.first === "me" ? "left" : "right");
+        };
+      });
+      choiceBox.hidden = true;
+      rouletteSkip = false;
+    } else {
+      // 敵は、先攻・後攻のどちらが勝ちやすいかを試してから選ぶ
+      const wantFirst = enemyWantsFirst(L, R);
+      firstSide = wantFirst ? "right" : "left";
+      choiceText.textContent = `${R.name}が選びます…`;
+      await sleep(900);
+    }
+    const chooser = holder === "left" ? L : R;
+    const pickedFirst = firstSide === holder;
+    show(firstSide);
+    choiceText.textContent = `${chooser.name}は${pickedFirst ? "先攻" : "後攻"}を選んだ`;
+    await sleep(1100);
+    choiceText.hidden = true;
+    return { side: firstSide, reason: `(${chooser.name}が${pickedFirst ? "先攻" : "後攻"}を選んだ)` };
+  }
+  // 敵の選び方:先攻・後攻でそれぞれ何回か戦わせて、勝ちが多いほう(同じなら先攻)
+  function enemyWantsFirst(L, R) {
+    const extra = battleExtra();
+    let first = 0, second = 0;
+    // v1.6.2:ラウンドの制限(20体目の漆黒の騎士)は、引き分け = 敵の勝ち
+    const enemyWins = (w) => w === "right" || (extra.timeLimit && w === "draw");
+    for (let i = 0; i < 100; i++) {
+      if (enemyWins(B.simulate(B.cloneUnit(L), B.cloneUnit(R), battleRng, { firstSide: "right", ...extra }).winner)) first++;
+      if (enemyWins(B.simulate(B.cloneUnit(L), B.cloneUnit(R), battleRng, { firstSide: "left", ...extra }).winner)) second++;
+    }
+    return first >= second;
+  }
+  // v1.6.1:アイクモードの11体目(漆黒の騎士)はラウンド1だけ
+  // v1.6.2:20体目の漆黒の騎士は10ラウンドまで(倒せなければ負け)
+  function battleExtra(arc = arcMatch) {
+    const en = arc && arcState ? arcState.enemies[arc.stage] : null;
+    if (en && en.roundOne) return { maxRounds: 1, drawText: "ラウンド1が終わった", roundOne: true };
+    if (en && en.roundLimit) return { maxRounds: en.roundLimit, drawText: `${en.roundLimit}ラウンドまでに${en.name}を倒せなかった…`, timeLimit: true };
+    return {};
   }
 
   const isRare = (name) => { const s = UI.skillInfo(name); return !!(s && s.rare); };
@@ -846,6 +1098,7 @@
     if (battle.wake) battle.wake();
     $("#roulette").hidden = true;
     $("#arena").classList.remove("slowmo", "ko-dim");
+    $$(".fighter").forEach((f) => f.classList.remove("attacking", "desc-open"));
   }
 
   // 待つ(スキップ・画面移動で即終了)。中断されたら false
@@ -923,9 +1176,16 @@
     $("#btn-start").disabled = true;
     $$(".btn-rematch").forEach((b) => (b.disabled = true));
     stopBattle();
-    const first = B.decideFirst(L, R, battleRng);
-    if (fx) await roulette(L, R, first, keepSkills || !!fixed, noSkills, arc ? (arcState.skillMode === "carry" ? [] : ["left"]) : null);
+    let first = B.decideFirst(L, R, battleRng);
+    const arcNow = arc ? { ...arcMatch } : null;
+    // v1.6.2:20体目の前のイベント(イナと漆黒の騎士・アイクと漆黒の騎士の会話)は削除。戦いの前の会話だけ残す(下の arcOpening)
+    if (arc) {
+      // v1.6.1:アーケードは、先攻・後攻を選ぶ権利を決める(演出OFFでも選ぶ画面は出す)
+      const spinSides = arcState.skillMode === "carry" ? [] : ["left"];
+      first = await roulette(L, R, first, false, !fx, fx ? spinSides : [], (slots, units) => arcChooseFirst(L, R, slots, units, fx));
+    } else if (fx) await roulette(L, R, first, keepSkills || !!fixed, noSkills, null);
     goto("battle");
+    if (arc) arcMatch = arcNow;
     const token = battle.token;
     battle.L = L;
     battle.R = R;
@@ -938,8 +1198,28 @@
     $("#tour-result").hidden = true;
     $("#arc-result").hidden = true;
     battle.tour = tourMatch ? { ...tourMatch } : null;
-    battle.arc = arcMatch ? { ...arcMatch } : null;
+    battle.arc = arcMatch ? { ...arcMatch, roundOne: !!battleExtra().roundOne, timeLimit: !!battleExtra().timeLimit } : null;
+    // v1.6.1:アイクモードの11体目(漆黒の騎士)は、戦いの前にセリフ
+    // v1.6.2:20体目の漆黒の騎士・21体目のアシュナードも、戦いの前に会話(毎回。スキップできる)
+    const opening = battle.arc ? arcOpening() : null;
+    if (opening) {
+      showBattleScreen(L, R);
+      await runTalk(opening);
+      if (token !== battle.token) return;
+    }
     runSet(token, first, bestOf);
+  }
+  // バトル画面に2人を出す(試合の前の会話・イベントのため)
+  function showBattleScreen(L, R) {
+    battle.L = L;
+    battle.R = R;
+    $("#battle-log").innerHTML = "";
+    $("#battle-result").hidden = true;
+    $("#round-label").textContent = "";
+    setScore(1, { left: 0, right: 0 }, 1);
+    renderFighters(B.forecast(L, R));
+    setHp("left", L.hp);
+    setHp("right", R.hp);
   }
 
   // v1.4.3:N本先取。2試合目からは、前の試合で後攻だったキャラが先攻(シャドウエッジ・待ち伏せは今までどおり先攻)
@@ -951,6 +1231,7 @@
     let last = null;
     setScore(need, wins, 1);
     for (let match = 1; match <= maxMatches; match++) {
+      battle.L = L; battle.R = R; battle.owner = {}; // v1.6.3:援軍・変身で入れ替わった枠を元に戻す
       if (match > 1) {
         const lp = B.hasSkill(L, R, "待ち伏せ") || L.weapon.alwaysFirst, rp = B.hasSkill(R, L, "待ち伏せ") || R.weapon.alwaysFirst;
         if (lp !== rp) {
@@ -961,7 +1242,7 @@
           reason = "(前の試合で後攻)";
         }
       }
-      const sim = B.simulate(B.cloneUnit(L), B.cloneUnit(R), battleRng, { firstSide, firstReason: reason });
+      const sim = B.simulate(B.cloneUnit(L), B.cloneUnit(R), battleRng, { firstSide, firstReason: reason, ...(battle.arc ? battleExtra(battle.arc) : {}) });
       battle.events = sim.events;
       battle.idx = 0;
       renderFighters(B.forecast(L, R));
@@ -977,6 +1258,7 @@
       setScore(need, wins, match);
       if (wins.left >= need || wins.right >= need) break;
       if (match === maxMatches) break;
+      if (battle.arc && battle.arc.roundOne) break; // v1.6.1:漆黒の騎士(ラウンド1だけ)は1試合で終わり
       // 試合の結果を見せてから次の試合へ
       const w = last.winner === "draw" ? null : last.winner === "left" ? L : R;
       if (!battle.skip) {
@@ -991,8 +1273,13 @@
     // v1.5.0:トーナメントは引き分けにしない。最後の試合で残ったHPの割合が多いほうの判定勝ち(同じならランダム)
     let judge = false;
     // v1.6.0:アーケードも同じ(引き分けなし)
+    // v1.6.1:漆黒の騎士(ラウンド1だけ)は、アイクが倒れていなければクリア
+    if (battle.arc && battle.arc.roundOne) winner = last.hp.left > 0 ? "left" : "right";
+    // v1.6.2:20体目の漆黒の騎士は、10ラウンドまでに倒せなければ負け(判定勝ちはなし)
+    let timeOut = false;
+    if (battle.arc && battle.arc.timeLimit && winner === "draw") { winner = "right"; timeOut = true; }
     if ((battle.tour || battle.arc) && winner === "draw") { winner = judgeWinner(last, battleRng); judge = true; }
-    finish({ winner, judge }, need > 1 ? wins : null);
+    finish({ winner, judge, timeOut }, need > 1 ? wins : null);
   }
 
   // 判定勝ち:最後の試合の残りHPの割合 → 同じならランダム
@@ -1031,17 +1318,22 @@
       <p class="skill-desc">${skillDescHtml(u)}</p>
       <div class="mini-fc">${miniFcHtml(calc)}</div>
       ${UI.bonusRow(B.bonusSummary(u, foe))}
+      <span class="atk-tag" aria-hidden="true">攻撃</span>
       <div class="float-layer"></div>`;
   }
 
-  function renderFighters(f) {
+  // now:戦いの途中で描き直すとき(変身・援軍)の、そのときのHP・最大HP(イベント)。
+  // v1.6.4:前は一度HPが満タンで描かれてから元に戻っていた(アシュナードの変身でアイクのHPが満タンに見えた)
+  function renderFighters(f, now) {
     battle.maxHp = { left: battle.L.maxHp, right: battle.R.maxHp }; // v1.4.5:エリート・大器晩成で変わる
+    if (now && now.maxHp) battle.maxHp = { ...now.maxHp };
     battle.cls = { left: battle.L.className, right: battle.R.className };
     const fl = fighterEl("left"), fr = fighterEl("right");
     fl.className = "fighter";
     fr.className = "fighter";
     fl.innerHTML = fighterHtml(battle.L, battle.R, f.left, f.right);
     fr.innerHTML = fighterHtml(battle.R, battle.L, f.right, f.left);
+    if (now && now.hp) for (const side of ["left", "right"]) { $(".hp-max", fighterEl(side)).textContent = battle.maxHp[side]; setHp(side, now.hp[side]); }
     for (const side of ["left", "right"]) {
       const u = side === "left" ? battle.L : battle.R;
       if (u.laguz) setGauge(side, { gauge: u.laguz.gauge, transformed: u.laguz.transformed });
@@ -1154,6 +1446,22 @@
     if (amount) floatText(side, `+${amount}`, "heal big-heal");
   }
 
+  // v1.6.4:太陽・天空の回復。黄色い閃光が自分を包んで、HPが回復する
+  function sunHeal(side, amount, keepPose) {
+    const el = fighterEl(side);
+    if (keepPose) { el.classList.remove("sol-glow"); void el.offsetWidth; el.classList.add("sol-glow"); setTimeout(() => el.classList.remove("sol-glow"), 900); }
+    else flash(el, "sol-glow");
+    const fill = $(".hp-fill", el);
+    if (fill) flash(fill, "hp-heal");
+    const layer = $(".float-layer", el);
+    const box = document.createElement("span");
+    box.className = "sun-burst";
+    box.innerHTML = `<i class="sb-ring"></i><i class="sb-ring r2"></i>${Array.from({ length: 10 }, (_, i) => `<i class="sb-p" style="left:${8 + i * 9}%;animation-delay:${(i % 4) * 0.08}s"></i>`).join("")}`;
+    layer.appendChild(box);
+    setTimeout(() => box.remove(), 1300);
+    if (amount) floatText(side, `+${amount}`, "heal big-heal sun");
+  }
+
   // v1.5.0:化身解除のとき、キャラ枠からオレンジのかけらが割れて落ちる
   function revertShards(side) {
     const layer = $(".float-layer", fighterEl(side));
@@ -1180,7 +1488,9 @@
   // 被ダメージの赤い光・揺れ(hit)などが効かなくなる(2ラウンド目以降に光らなかった原因)。ほかの演出の前に外す
   // v1.5.0:回復の演出(heal-fx)などが残っていると、あとのダメージの演出が緑のままになっていた
   // (heal-fx の指定が hit より後ろにあるため)。キャラ枠に新しい演出を出すときは、前の演出をすべて外す
-  const FIGHTER_FX = ["lunge", "hit", "crit-hit", "heal-fx", "skill", "transform-fx", "revert-fx", "rage-fx", "sleep-fx", "poison", "ko"];
+  // v1.6.4:奥義の動き(rise-up・dive-down・charge・charge-luna・leap・hover・sol-glow)を追加
+  const FIGHTER_FX = ["lunge", "hit", "crit-hit", "heal-fx", "skill", "transform-fx", "revert-fx", "rage-fx", "sleep-fx", "poison", "ko",
+    "rise-up", "dive-down", "charge", "charge-luna", "leap", "hover", "sol-glow", "vanish-fx"];
   function flash(el, cls) {
     if (el.classList.contains("fighter")) {
       if (cls === "lunge") el.classList.remove("lunge");
@@ -1242,7 +1552,7 @@
       if (e.broken) setBroken(side, e.broken[side]);
     }
     // 数字が変わる様子を見せるイベント(化身・怒り/勇将・睡眠・武器破壊・咆哮など)
-    const changed = ["transform", "revert", "rage", "sleep", "wake", "break", "skill", "spd-down", "heal"].includes(e.type);
+    const changed = ["transform", "revert", "rage", "sleep", "wake", "break", "skill", "spd-down", "heal", "paralyze"].includes(e.type);
     if (e.forecast) setMiniFc(e.forecast, changed);
     if (e.bonus) setBonus(e.bonus, changed);
   }
@@ -1277,16 +1587,96 @@
     $$(".fighter").forEach((f) => f.classList.remove("hp-slow", "ko-target"));
   }
 
+  // ================= v1.6.4:奥義(流星・月光・太陽・天空)の演出 =================
+  // 背景:アリーナ全体に、奥義ごとの背景(流星=緑の星、月光=青い月の光、太陽=黄色い太陽、天空=空と光の柱)を重ねる。
+  // 攻撃の1撃ごとに背景の時間を延ばし、最後の1撃のあとに消える
+  const OUGI_BG = {
+    meteor: () => `<i class="ob-glow"></i>${Array.from({ length: 14 }, (_, i) => `<i class="ob-star" style="left:${(i * 37) % 100}%;top:${-20 + ((i * 23) % 50)}%;animation-delay:${(i % 7) * 0.13}s;--s:${0.6 + (i % 4) * 0.25}"></i>`).join("")}`,
+    luna: () => `<i class="ob-glow"></i><i class="ob-moon"></i><i class="ob-ray"></i><i class="ob-ray r2"></i><i class="ob-ray r3"></i>`,
+    sol: () => `<i class="ob-glow"></i><i class="ob-sun"></i><i class="ob-sunrays"></i>`,
+    aether: () => `<i class="ob-glow"></i><i class="ob-emblem"><b class="sun"></b><b class="moon"></b></i><i class="ob-pillar"></i>${Array.from({ length: 12 }, (_, i) => `<i class="ob-spark" style="left:${8 + ((i * 41) % 84)}%;animation-delay:${(i % 6) * 0.15}s"></i>`).join("")}`,
+  };
+  function ougiBg(kind, side) {
+    if (battle.skip || !OUGI_BG[kind]) return;
+    const arena = $("#arena");
+    let bg = $(".ougi-bg", arena);
+    if (!bg) { bg = document.createElement("div"); arena.appendChild(bg); }
+    bg.className = `ougi-bg ${kind} ${side}`;
+    bg.innerHTML = OUGI_BG[kind]();
+    ougiKeep(3200);
+  }
+  function ougiKeep(ms) {
+    clearTimeout(battle.ougiTimer);
+    battle.ougiTimer = setTimeout(ougiEnd, ms * (battle.speed || 1));
+  }
+  function ougiEnd() {
+    clearTimeout(battle.ougiTimer);
+    $$(".ougi-bg").forEach((bg) => { bg.classList.add("out"); setTimeout(() => bg.remove(), 500); });
+  }
+  // 攻撃の前の動き(踏み込み・タメ・上昇)。戻り値:待ち時間(ms)。null なら中断
+  async function strikeLead(e, token) {
+    const el = fighterEl(e.actor), n = e.n || 0;
+    $$(".fighter").forEach((f) => f.classList.toggle("attacking", f === el)); // v1.6.6:攻撃している側(縦向きで枠が光る)
+    switch (e.fx) {
+      case "meteor":
+        // 流星:1〜3撃目は3連符(たたたん)、4撃目は上昇斬り、5撃目は少しタメてから振り下ろし
+        if (n <= 3) { flash(el, "lunge"); return 170; }
+        if (n === 4) { flash(el, "rise-up"); return 260; }
+        flash(el, "charge");
+        if (!(await wait(700, token))) return null;
+        flash(el, "dive-down");
+        return 200;
+      case "luna":
+        // 月光:青い光をためてから、一撃
+        flash(el, "charge-luna");
+        if (!(await wait(900, token))) return null;
+        flash(el, "lunge");
+        return 260;
+      case "sol":
+        flash(el, "lunge");
+        return 420;
+      case "aether":
+        // 天空:1撃目(太陽)は高く跳び上がりながら斬り上げる → 2撃目(月光)は空中でためてから、まっすぐ落ちて斬り下ろす
+        if (n <= 1) { flash(el, "leap"); return 560; }
+        el.classList.add("hover");
+        if (!(await wait(650, token))) return null;
+        el.classList.remove("hover", "leap");
+        flash(el, "dive-down");
+        return 180;
+      default:
+        flash(el, "lunge");
+        return 500;
+    }
+  }
+  // 攻撃の演出の種類(斬撃の色・向き)
+  function strikeImpact(e) {
+    const n = e.n || 0;
+    const kind = e.fx === "meteor" ? (n === 4 ? "meteor rise" : n === 5 ? "meteor down" : "meteor")
+      : e.fx === "aether" ? (n <= 1 ? "aether rise" : "aether down") : e.fx || "";
+    return (kind + (e.crit ? " crit" : "")).trim() || e.crit;
+  }
+  // 当たったあとの待ち時間
+  function strikeAfter(e) {
+    const n = e.n || 0;
+    if (e.fx === "meteor") return n <= 2 ? 240 : n === 3 ? 520 : n === 4 ? 420 : 1100;
+    if (e.fx === "luna") return 1050;
+    if (e.fx === "aether") return n <= 1 ? 700 : 1150;
+    return e.crit ? 1100 : 900;
+  }
+
   // 攻撃:「○○の攻撃!」→ 一拍 →(必殺なら画面が揺れる)→「○○にダメージ!」→ 演出 → HPバーが減る
+  // v1.6.4:奥義(e.fx)のときは、奥義ごとのテンポと斬撃
   async function playStrike(e, token) {
+    if (e.fx) ougiKeep(3200);
     const li = logLine(e, e.lead);
-    flash(fighterEl(e.actor), "lunge");
-    if (!(await wait(500, token))) return false;
+    const lead = await strikeLead(e, token);
+    if (lead == null || !(await wait(lead, token))) return false;
     if (e.type === "miss") {
       li.textContent = `${e.lead}……${e.result}`;
-      floatText(e.target, "MISS", "miss");
+      floatText(e.target, e.result === "見失った!" ? "見失った" : "MISS", "miss");
       applyState(e, false);
-      return wait(600, token);
+      if (e.fx && (e.fx !== "meteor" || e.n === 5) && (e.fx !== "aether" || e.n === 2)) ougiKeep(700);
+      return wait(e.fx === "meteor" && e.n < 5 ? 260 : 600, token);
     }
     if (e.guarded) {
       // 女神の加護:弾かれてダメージ0
@@ -1305,23 +1695,30 @@
       li.textContent = `${li.textContent}${e.result}`;
       return koSequence(e.target, token, e);
     }
+    // v1.6.4:流星の1〜4撃目はテンポを崩さないように、必殺の大きな文字を出さない(斬撃と数字は必殺のまま)
+    const quickCrit = e.fx === "meteor" && (e.n || 0) <= 4;
     if (e.crit) {
       li.textContent = `${e.lead}必殺の一撃!`;
       li.classList.add("log-crit");
-      arenaFx("必殺の一撃!!", "fx-crit", C.bigEffectMs);
-      flash($("#arena"), "rattle");
-      if (!(await wait(C.bigEffectMs, token))) return false;
+      if (!quickCrit) {
+        arenaFx("必殺の一撃!!", "fx-crit", C.bigEffectMs);
+        flash($("#arena"), "rattle");
+        if (!(await wait(C.bigEffectMs, token))) return false;
+      }
     }
     // 命中:斬撃の演出 → ダメージの数字 → HPバーが減る
     // v1.4.3:斬撃からHPが減るまでを早くした(前は 0.16秒後に数字 → さらに0.3秒後にHP)
-    impact(e.target, e.crit);
+    impact(e.target, strikeImpact(e));
     flash(fighterEl(e.target), e.crit ? "crit-hit" : "hit");
+    if (e.fx === "luna" || (e.fx === "meteor" && e.n === 5) || (e.fx === "aether" && e.n === 2)) flash($("#arena"), "hard-hit");
     if (!(await wait(120, token))) return false;
     li.textContent = `${li.textContent}${e.result}`;
     floatText(e.target, `-${e.damage}`, e.crit ? "crit" : "dmg");
-    if (e.finishing) return koSequence(e.target, token, e); // とどめ:HPを減らしてからK.O.の演出
+    // 最後の1撃のあと、背景は少しして消える(太陽・天空の1撃目は、このあと回復があるので長め)
+    if (e.fx) ougiKeep((e.fx === "aether" && (e.n || 0) <= 1) || (e.fx === "meteor" && e.n < 5) ? 2400 : e.fx === "sol" ? 1800 : 1000);
+    if (e.finishing) { ougiEnd(); return koSequence(e.target, token, e); } // とどめ:HPを減らしてからK.O.の演出
     applyState(e, false); // ここでHPバーが減る
-    return wait(e.crit ? 1100 : 900, token);
+    return wait(strikeAfter(e), token);
   }
 
   // その他のイベントの演出。戻り値:次までの待ち時間(ms)
@@ -1340,13 +1737,21 @@
         flash(fighterEl(e.target), "poison"); floatText(e.target, `-${e.damage}`, "poison");
         return 800;
       case "status-add": return 550;
-      case "heal": healFx(e.target, e.amount); return 900; // v1.4.5:太陽・天空・リザイアなどの吸収も回復の演出
+      case "heal":
+        // v1.6.4:太陽・天空の回復は、黄色い閃光が自分を包む(天空は空中のまま)
+        if (e.fx) { sunHeal(e.target, e.amount, e.fx === "aether"); return e.fx === "aether" ? 800 : 1200; }
+        healFx(e.target, e.amount); return 900; // v1.4.5:太陽・天空・リザイアなどの吸収も回復の演出
+      case "paralyze": // v1.6.4:衝撃の麻痺
+        flash(fighterEl(e.target), "hit");
+        floatText(e.target, "麻痺", "debuff");
+        return 900;
       case "skill": {
         // v1.4.5:回復するスキル(回復・空の祝福)は回復の演出。前はスキルの光と同時に数字だけ出ていた
         if (e.heal) healFx(e.actor, e.heal);
         else flash(fighterEl(e.actor), "skill");
         if (e.elite) floatText(e.actor, "クラスチェンジ", "elite");
         if (e.skill === "大器晩成") floatText(e.actor, "能力アップ", "elite");
+        if (e.buffText) floatText(e.actor, e.buffText, "elite"); // v1.6.5:『盗む』のドーピング
         if (e.skill === "瞬殺") {
           // v1.3.4:瞬殺専用の演出(背景が赤く、黒い斬撃)
           arenaFx(`<i class="ss-slash"></i><i class="ss-slash s2"></i><i class="ss-slash s3"></i><b><small>奥義</small>瞬殺</b>`, `fx-shunsatsu ${e.actor}`, 1400);
@@ -1358,12 +1763,16 @@
         }
         if (e.target && e.skill === "咆哮") floatText(e.target, "能力ダウン", "debuff");
         if (e.ougi) {
-          arenaFx(`<small>奥義</small>${UI.esc(e.skill)}`, `fx-ougi ${e.actor}${e.healFx ? " heal" : ""}`, C.bigEffectMs);
-          return C.bigEffectMs + (e.healFx ? 400 : 100);
+          // v1.6.4:流星・月光・太陽・天空は、奥義ごとの背景と色の帯
+          if (e.fx) ougiBg(e.fx, e.actor);
+          $$(".fighter").forEach((f) => f.classList.toggle("attacking", f === fighterEl(e.actor))); // v1.6.6:奥義を出す側を光らせる
+          arenaFx(`<small>奥義</small>${UI.esc(e.skill)}`, `fx-ougi ${e.actor}${e.healFx ? " heal" : ""}${e.fx ? " ob-" + e.fx : ""}`, C.bigEffectMs + (e.fx ? 200 : 0));
+          return C.bigEffectMs + (e.healFx ? 400 : 100) + (e.fx ? 200 : 0);
         }
         // v1.3.3:通常スキルもカットイン。防御は青、回復・祈りは淡い緑、それ以外(バフ系)は橙
-        const kind = C.skillKinds.guard.includes(e.skill) ? "guard" : C.skillKinds.heal.includes(e.skill) ? "heal" : "buff";
-        arenaFx(`<small>${e.fromWeapon ? "武器スキル" : "通常スキル"}</small>${UI.esc(e.skill)}`, `fx-skill ${kind} ${e.actor}`, C.skillEffectMs);
+        const kind = C.skillKinds.guard.includes(e.skill) ? "guard" : C.skillKinds.heal.includes(e.skill) || (e.steal && e.heal != null) ? "heal" : "buff";
+        // v1.6.5:兵種スキル(盗む)は「兵種スキル」と、盗んだ物の名前を出す
+        arenaFx(`<small>${e.fromWeapon ? "武器スキル" : e.classSkill ? "兵種スキル" : "通常スキル"}</small>${UI.esc(e.skill)}${e.steal ? `<em>${UI.esc(e.steal)}を盗んだ!</em>` : ""}`, `fx-skill ${kind} ${e.actor}`, C.skillEffectMs + (e.steal ? 300 : 0));
         return C.skillEffectMs + (e.heal || e.elite ? 400 : 100);
       }
       case "cancel": floatText(e.actor, "無効", "miss"); return 750;
@@ -1397,14 +1806,14 @@
         floatText(e.actor, "Zzz…", "sleep");
         return 800;
       case "wake":
-        floatText(e.actor, "目覚めた!", "revert");
+        floatText(e.actor, e.paralysis ? "麻痺が治った" : "目覚めた!", "revert");
         return 800;
       case "break":
         flash(fighterEl(e.target), "hit");
         floatText(e.target, "武器破壊", "debuff");
         return 1000;
       case "spd-down": // v1.4.4:手斧・手槍系で相手の速さ-1
-        floatText(e.target, `速さ-${e.amount}`, "debuff");
+        floatText(e.target, e.label || `速さ-${e.amount}`, "debuff"); // v1.6.5:長弓などは下がった能力の名前
         return 650;
       case "gauge": return 200;
       default: return 300;
@@ -1427,7 +1836,7 @@
 
   // 1試合を再生する。戻り値:最後のイベント(end)。中断されたら undefined
   // match:N本先取のときの試合の番号(0なら出さない)
-  async function play(token, match = 0, final = false) {
+  async function play(token, match = 0, final = false, noCount = false) {
     // v1.4.5:最終試合の演出(画面が暗くなり、赤い帯で「FINAL MATCH」→ 勝ち数)
     if (final && !battle.skip) {
       const arena = $("#arena");
@@ -1439,18 +1848,24 @@
       $$(".fx-final").forEach((x) => x.remove()); // 速度:はやい のときも、カウントダウンと重ならないように
       if (!ok) return;
     }
-    // 3, 2, 1, BATTLE!!
-    for (const n of ["3", "2", "1"]) {
+    // 3, 2, 1, BATTLE!!(v1.6.1:イベントの戦いは出さない)
+    for (const n of noCount ? [] : ["3", "2", "1"]) {
       arenaFx(n, "fx-count", 700);
       if (!(await wait(700, token))) return;
     }
-    arenaFx(match ? `<small>第${match}試合</small>BATTLE!!` : "BATTLE!!", "fx-count battle", 900);
-    if (!(await wait(900, token))) return;
+    if (!noCount) {
+      arenaFx(match ? `<small>第${match}試合</small>BATTLE!!` : "BATTLE!!", "fx-count battle", 900);
+      if (!(await wait(900, token))) return;
+    }
 
     while (battle.idx < battle.events.length) {
       if (token !== battle.token) return;
       const e = battle.events[battle.idx++];
-      if (e.type === "end") { applyState(e); return e; }
+      if (e.type === "end") { ougiEnd(); applyState(e); return e; }
+      // v1.6.2:変身(アシュナード)。スキップ中は会話も飛ばして、変身後の姿にするだけ
+      if (e.type === "phase2") { if (!(await playPhase2(e, token)) && token !== battle.token) return; continue; }
+      // v1.6.3:『援軍』が参戦する/倒れて元のキャラに戻る
+      if (e.type === "swap") { if (!(await playSwap(e, token)) && token !== battle.token) return; continue; }
       if (battle.skip) { applyState(e); continue; }
       if (e.type === "hit" || e.type === "miss") {
         if (!(await playStrike(e, token)) && token !== battle.token) return;
@@ -1470,6 +1885,65 @@
     }
   }
 
+  // v1.6.2:変身前のアシュナードを倒した → 戦闘画面のまま会話 → 変身の演出 → 変身後の会話 → 次のラウンドへ
+  async function playPhase2(e, token) {
+    const side = e.actor;
+    const old = side === "left" ? battle.L : battle.R;
+    const p = old.char.phase2;
+    const talk = !battle.skip;
+    endKo();
+    if (talk) { await runTalk(ashnardDownScript()); if (token !== battle.token) return false; }
+    if (p) {
+      const nu = B.makeUnit(p, DB.weapons[p.weapon] ? p.weapon : old.weapon.id, side);
+      nu.bio = old.bio;
+      nu.skill = p.skill !== undefined ? p.skill : old.skill;
+      nu.extraSkills = (p.extraSkills || old.extraSkills || []).slice();
+      if (side === "left") battle.L = nu; else battle.R = nu;
+    }
+    const arena = $("#arena");
+    if (talk) {
+      // 変身の演出:画面が赤黒く暗転 → 大きく揺れて、化身と同じ光 → HPが満タンになる
+      arena.classList.add("ko-dim", "ss-dim");
+      if (!(await wait(900, token))) { arena.classList.remove("ko-dim", "ss-dim"); return false; }
+      flash(arena, "hard-hit");
+    }
+    renderFighters(e.forecast || B.forecast(battle.L, battle.R), e);
+    applyState(e);
+    if (talk) {
+      arena.classList.add("ko-dim", "ss-dim");
+      flash(fighterEl(side), "transform-fx");
+      arenaFx(`<small>メダリオンの力</small>${UI.esc((side === "left" ? battle.L : battle.R).name)}`, `fx-transform ${side}`, 1600);
+      const ok = await wait(1800, token);
+      arena.classList.remove("ko-dim", "ss-dim");
+      if (!ok) return false;
+      await runTalk(ashnardRiseScript());
+      if (token !== battle.token) return false;
+    }
+    return true;
+  }
+
+  // v1.6.3:『援軍』。参戦したら、その側のキャラ枠を援軍に入れ替える(倒れたら元のキャラに戻す)
+  async function playSwap(e, token) {
+    const side = e.actor, key = side === "left" ? "L" : "R";
+    battle.owner = battle.owner || {};
+    if (e.back) {
+      if (battle.owner[side]) battle[key] = battle.owner[side];
+      delete battle.owner[side];
+    } else {
+      battle.owner[side] = battle[key];
+      const nu = B.makeUnit(e.char, e.weaponId, side);
+      nu.bio = C.biorhythm[1];
+      battle[key] = nu;
+    }
+    renderFighters(e.forecast || B.forecast(battle.L, battle.R), e);
+    applyState(e);
+    if (battle.skip) return true;
+    const u = battle[key];
+    flash(fighterEl(side), "transform-fx");
+    arenaFx(`<small>${e.back ? "交代" : "援軍"}</small>${UI.esc(u.name)}`, `fx-transform ${side}`, 1300);
+    return wait(1500, token);
+  }
+
   // wins:N本先取のときの勝ち数(1本先取なら null)
   function finish(e, wins) {
     $("#btn-skip").disabled = true;
@@ -1479,12 +1953,16 @@
     if (e.winner === "draw") {
       text.textContent = "引き分け" + score;
     } else {
-      const winner = e.winner === "left" ? battle.L : battle.R;
+      // v1.6.3:援軍が戦っていても、勝ったのは援軍を呼んだキャラ
+      const winner = (battle.owner && battle.owner[e.winner]) || (e.winner === "left" ? battle.L : battle.R);
       text.textContent = `${winner.name} の${e.judge ? "判定勝ち(残りHPの割合)" : "勝利"}!${score}`;
+      if (battle.arc && battle.arc.roundOne && e.winner === "left") text.textContent = `${winner.name}は${battle.R.name}の攻撃に耐えた!`;
+      if (e.timeOut) text.textContent = `${battleExtra(battle.arc).maxRounds}ラウンドまでに${battle.R.name}を倒せなかった…`;
       fighterEl(e.winner).classList.add("winner");
       fighterEl(e.winner === "left" ? "right" : "left").classList.add("loser");
     }
     // v1.5.0:トーナメントの試合なら、結果を記録してトーナメント表へ(もう一度は出さない)
+    $$(".fighter").forEach((f) => f.classList.remove("attacking"));
     const inTour = !!battle.tour;
     const inArc = !!battle.arc; // v1.6.0:アーケードの試合(コンティニュー・次へ)
     $$(".btn-rematch").forEach((b) => (b.hidden = inTour || inArc));
@@ -1492,7 +1970,14 @@
     $("#tour-result").hidden = !inTour;
     $("#arc-result").hidden = !inArc;
     if (inTour) tourFinished(e, wins);
-    if (inArc) arcFinished(e);
+    const seq = inArc ? arcFinished(e) : null;
+    // v1.6.1:アーケードのクリア・ゲームオーバーなどの演出のあとで、結果のボタンを出す
+    if (seq) {
+      $("#battle-result").hidden = true;
+      const token = battle.token;
+      seq().then(() => { if (token === battle.token) $("#battle-result").hidden = false; });
+      return;
+    }
     $("#battle-result").hidden = false;
   }
 
@@ -1743,13 +2228,7 @@
     $("#tour-info").hidden = !on;
     $("#prep-title").textContent = arcMatch ? "アーケード ― バトル準備" : tourMatch ? "トーナメント ― バトル準備" : "バトル準備";
     if (!on) return;
-    if (arcMatch) {
-      const st = arcState, ex = st.stage === A_.EXTRA;
-      $("#tour-info").innerHTML = `<p class="ti-round">${A_.stageName(st.stage)}${ex ? "(赤竜イナ)" : ""} / 全${A_.STAGES}戦</p>
-        <p class="ti-rule">1本先取 ・ スキル:${arcSkillModeText(st.skillMode)} ・ ${ex ? `イナ戦 残り${A_.inaLeft(st)}回` : `コンティニュー${st.continues}回`}</p>
-        <button type="button" class="link-btn" data-goto="arcade">アーケード画面へ戻る</button>`;
-      return;
-    }
+    if (arcMatch) { arcPrepInfo(); return; }
     const st = tourState, m = tourMatch.match;
     $("#tour-info").innerHTML = `<p class="ti-round">${matchTitle(st, tourMatch.round, m)}</p>
       <p class="ti-rule">${st.bestOf}本先取 ・ スキル:${skillModeText(st.skillMode)}</p>
@@ -1796,9 +2275,10 @@
 
   // ================= アーケード(v1.6.0) =================
   // 計算は js/arcade.js。ここは画面(準備・勝ち抜きの表・スキルの選択・レベルアップの演出・結果)とバトルとのつなぎ
+  // v1.6.1:スキルは持ち越しだけ・選んだキャラの能力値と武器・先攻後攻を選ぶ権利・クリア/ゲームオーバーの演出・アイクモード(会話とイベント)
   const ARC_KEY = "arenaBattle.arcade";
   function loadArc() {
-    if (arcState && !S.find(arcState.charId)) clearArc(); // キャラが削除された
+    if (arcState && !A_.isIke(arcState) && !S.find(arcState.charId)) clearArc(); // キャラが削除された
     if (arcState) return arcState;
     let st = null;
     try { st = JSON.parse(global.localStorage.getItem(ARC_KEY) || "null"); } catch (e) { st = null; }
@@ -1814,12 +2294,36 @@
     arcMatch = null;
     try { global.localStorage.removeItem(ARC_KEY); } catch (e) { /* なし */ }
   }
-  const arcPlayer = () => A_.playerChar(arcState, S.find(arcState.charId));
+  // 自分のキャラ(保存されたもの。アイクモードならアイク)
+  const arcSaved = (st = arcState) => A_.savedChar(st, (id) => S.find(id));
+  const arcPlayer = () => A_.playerChar(arcState, arcSaved());
   const arcEnemy = () => A_.ensureEnemy(arcState);
   const arcSkillModeText = (m) => (m === "carry" ? "最初に選んで持ち越し" : "毎回ルーレット");
   const chips = (list) => list.filter(Boolean).map((n) => UI.skillChip(n, false)).join("");
+  // 敵の呼び名(勝ち抜きの表・次の敵)
+  function arcStageLabel(st, stage) {
+    if (A_.isIke(st)) {
+      const I = A_.IKE;
+      // v1.6.3:18体目はイナではなく、ふつうの敵
+      return { [I.KNIGHT1]: "漆黒の騎士", [I.FERAL]: "赤竜", [I.BOSS]: "漆黒の騎士", [I.ASHNARD]: "アシュナード" }[stage] || (stage >= A_.PROMOTED_FROM ? "上級職" : "");
+    }
+    return stage === A_.EXTRA ? "イナ" : stage >= A_.PROMOTED_FROM ? "上級職" : "";
+  }
+  function arcNextTitle(st, en) {
+    const stage = st.stage;
+    if (A_.isIke(st)) {
+      const I = A_.IKE;
+      const extra = { [I.KNIGHT1]: " ― 漆黒の騎士(ラウンド1だけ)", [I.FERAL]: " ― なりそこない", [I.BOSS]: " ― 漆黒の騎士との決戦", [I.ASHNARD]: " ― 狂王アシュナード" }[stage] || "";
+      return `${A_.stageName(stage, st)}${extra} ・ Lv${en.arcadeLv}${!extra && stage >= A_.PROMOTED_FROM ? " ・ 上級職" : ""}`;
+    }
+    const ex = stage === A_.EXTRA;
+    return `${A_.stageName(stage, st)}${ex ? " ― 赤竜イナ" : ""} ・ Lv${en.arcadeLv}${!ex && stage >= A_.PROMOTED_FROM ? " ・ 上級職" : ""}`;
+  }
+  const inaLimited = (st) => !A_.isIke(st) && st.stage === A_.EXTRA;
+  // v1.6.3:アシュナード戦はコンティニュー5回まで
+  const ashLimited = (st) => A_.isIke(st) && st.stage === A_.IKE.ASHNARD;
 
-  // スキルを決める。敵は決まっている。自分は持ち越しなら決まっている、毎回ルーレットなら draw のときに抽選(イナ戦は2つ)
+  // スキルを決める。敵は決まっている。自分は持ち越しなら決まっている、毎回ルーレット(v1.6.0 の保存データだけ)なら draw のときに抽選
   function arcSkills(L, R, draw) {
     const en = arcEnemy();
     R.skill = en.skill || null;
@@ -1841,22 +2345,62 @@
     }
   }
 
-  // ---- 準備:キャラ・スキルの決め方 ----
-  const asetup = { pick: null, skillMode: "random" };
+  // ---- 準備:モード・キャラ(v1.6.1:スキルは持ち越しだけ。選んだキャラの能力値と武器を出す) ----
+  const asetup = { pick: null, mode: "normal", view: "human" };
+  const AS_RULES = {
+    normal: [
+      "11連戦を勝ち抜く。敵はランダムに生まれたキャラ",
+      "自分はLv1から。1勝でLv+2、Lv21でクラスチェンジ(ラグズはLv1のまま進み、6勝目から+2)",
+      "敵はLv2から2つずつ上がる。5体目からスキル、8体目から上級職",
+      "スキルは最初に2つから1つ。勝つと交換できる。9体目を倒すと2つ目を追加",
+      "先攻・後攻は、選ぶ権利をルーレットで決める",
+      "11体目(EXTRA)は赤竜のイナ。10体目を倒すと★、イナを倒すと★★",
+      "負けてもコンティニューできる(イナ戦は3回まで)",
+    ],
+    ike: [
+      "アイク(レンジャー Lv1・てつの剣)で全20面",
+      "10体目まではふつうと同じ。ただしLv20まで(クラスチェンジなし)",
+      "倒した敵の剣などを手に入れる。剣はラグネルのほかに4つまで(5つ目は1つ手放す)",
+      "11体目は漆黒の騎士。ラウンド1を耐えればクリア → ロードにクラスチェンジ",
+      "12〜19体目はLv+3ずつ。18体目の敵はスキル2つ",
+      "19体目はなりそこない、20体目は漆黒の騎士(10ラウンドまでに倒せないとゲームオーバー)",
+      "スキル・先攻後攻はふつうと同じ。負けてもコンティニューできる(回数の制限なし)",
+    ],
+  };
   function renderArcSetup() {
+    const ike = asetup.mode === "ike";
     const chars = eligibleChars();
     if (!chars.some((c) => c.id === asetup.pick)) asetup.pick = null;
-    $$("#as-skill .bo-btn").forEach((b) => b.classList.toggle("on", b.dataset.v === asetup.skillMode));
-    $("#as-skill-note").textContent = asetup.skillMode === "carry"
-      ? "最初に、ランダムの2つのスキルから1つを選びます。勝つたびに、ランダムの2つか倒した敵のスキルと交換できます(交換しなくてもよい)。10体目を倒したときだけ、2つ目のスキルとして追加できます。"
-      : "試合ごとにスキルのルーレット。EXTRA(イナ戦)だけはスキルが2つになります。";
+    $$("#as-mode .bo-btn").forEach((b) => b.classList.toggle("on", b.dataset.v === asetup.mode));
+    $("#asetup").classList.toggle("ike", ike);
+    $("#as-pick").hidden = ike;
+    $("#as-mode-note").textContent = ike ? "アイクで全20面を勝ち抜く、物語つきのモードです。" : "自分のキャラを1人選んで、11連戦を勝ち抜きます。";
+    $("#as-rules").innerHTML = AS_RULES[asetup.mode].map((t) => `<li>${UI.esc(t)}</li>`).join("");
     $("#as-chars").innerHTML = chars.length ? chars.map((c) => `<li data-id="${UI.esc(c.id)}" class="${c.id === asetup.pick ? "picked" : ""}" tabindex="0" role="radio" aria-checked="${c.id === asetup.pick}">
         ${UI.charIcon(c, "small")}<div class="li-text"><div class="li-name">${UI.esc(c.name)}${UI.genderMark(c)}</div><div class="li-sub">${UI.esc(c.className)}</div></div></li>`).join("")
       : `<li class="empty">バトルに出せるキャラがいません。<button type="button" class="link-btn" data-goto="create">キャラ作成</button>から作ってください。</li>`;
-    const c = asetup.pick ? S.find(asetup.pick) : null;
-    $("#as-picked").innerHTML = c ? `選んだキャラ <b>${UI.esc(c.name)}</b>(${UI.esc(c.className)})` : "キャラを1人選んでください";
+    const c = ike ? A_.ikeChar(null) : asetup.pick ? S.find(asetup.pick) : null;
+    $("#as-picked").innerHTML = c && !ike ? `選んだキャラ <b>${UI.esc(c.name)}</b>(${UI.esc(c.className)})` : "キャラを1人選んでください";
+    renderArcDetail(c, ike);
     $("#as-start").disabled = !c;
-    $("#as-start-note").textContent = c ? "Lv1から始まります(キャラ一覧の能力値は変わりません)。" : "";
+    $("#as-start-note").textContent = !c ? "" : "Lv1から始まります。最初に、ランダムの2つのスキルから1つを選びます。" + (ike ? "" : "(キャラ一覧の能力値は変わりません)");
+  }
+  // 選んだキャラの能力値(アーケードの始まりの Lv1)と武器。ラグズは化身前/化身後の切り替えつき
+  function renderArcDetail(c, ike) {
+    const box = $("#as-detail");
+    if (!c) { box.innerHTML = `<p class="muted as-detail-empty">キャラを選ぶと、ここに能力値と武器が出ます</p>`; return; }
+    const st = A_.create(c, { mode: ike ? "ike" : "normal", rng: global.Rng.createSeededRng("asetup") });
+    const me = { ...A_.playerChar(st, ike ? A_.ikeChar(st) : c), arcadeLv: 1 };
+    const laguz = me.race === "ラグズ" && me.statsHuman;
+    const view = laguz ? asetup.view : "transformed";
+    const toggle = laguz ? `<label class="form-switch" data-view="${view}" title="能力値の表示(化身前/化身後)">
+      <span class="fs-l">化身前</span><input type="checkbox" class="form-check as-form" ${view === "transformed" ? "checked" : ""} aria-label="化身後の能力値を表示">
+      <span class="fx-switch" aria-hidden="true"></span><span class="fs-r">化身後</span></label>` : "";
+    box.innerHTML = `<div class="side-top"><p class="side-label">${ike ? "アイクモードのキャラ" : "選んだキャラ"}<small>アーケードの始まり(Lv1)</small></p>${toggle}</div>
+      ${UI.fighterHeader(me, { element: true })}
+      ${UI.statGrid(me, { element: true, form: view })}
+      <h4 class="sub weapon-head">武器</h4>
+      ${UI.weaponCards(me)}`;
   }
   const pickArc = (id) => { asetup.pick = id; renderArcSetup(); };
   $("#as-chars").addEventListener("click", (e) => { const li = e.target.closest("li[data-id]"); if (li) pickArc(li.dataset.id); });
@@ -1864,11 +2408,17 @@
     const li = e.target.closest("li[data-id]");
     if (li && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); pickArc(li.dataset.id); }
   });
-  $("#as-skill").addEventListener("click", (e) => { const b = e.target.closest(".bo-btn"); if (b) { asetup.skillMode = b.dataset.v; renderArcSetup(); } });
+  $("#as-mode").addEventListener("click", (e) => { const b = e.target.closest(".bo-btn"); if (b) { asetup.mode = b.dataset.v; renderArcSetup(); } });
+  $("#as-detail").addEventListener("change", (e) => {
+    if (!e.target.classList.contains("as-form")) return;
+    asetup.view = e.target.checked ? "transformed" : "human";
+    renderArcSetup();
+  });
   $("#as-start").addEventListener("click", () => {
-    const c = asetup.pick && S.find(asetup.pick);
+    const ike = asetup.mode === "ike";
+    const c = ike ? A_.ikeChar(null) : asetup.pick && S.find(asetup.pick);
     if (!c) return;
-    arcState = A_.create(c, { skillMode: asetup.skillMode, rng: battleRng });
+    arcState = A_.create(c, { mode: asetup.mode, skillMode: "carry", rng: battleRng });
     A_.ensureEnemy(arcState);
     saveArc();
     arcMsg = "";
@@ -1878,11 +2428,14 @@
   // ---- アーケードの画面 ----
   let arcMsg = "";
   let arcPlaying = false;
+  let arcSwapName = null; // v1.6.1:交換するスキル(1つ目・2つ目のどちらと交換するかを選ぶ間)
   function renderArcade() {
     const st = loadArc();
     if (!st) { goto("asetup"); return; }
-    const saved = S.find(st.charId);
-    $("#arc-rule").textContent = `${saved.name} ・ スキル:${arcSkillModeText(st.skillMode)} ・ コンティニュー${st.continues}回 ・ 10体目を倒すと★、EXTRAのイナを倒すと★★`;
+    const saved = arcSaved(st);
+    $("#arc-rule").textContent = A_.isIke(st)
+      ? `アイクモード(全${A_.stagesOf(st)}面) ・ スキル:${arcSkillModeText(st.skillMode)} ・ コンティニュー${st.continues}回`
+      : `${saved.name} ・ スキル:${arcSkillModeText(st.skillMode)} ・ コンティニュー${st.continues}回 ・ 10体目を倒すと★、EXTRAのイナを倒すと★★`;
     renderLadder(st);
     renderArcMe(st);
     const q = $("#btn-arc-quit");
@@ -1891,23 +2444,33 @@
     q.hidden = false;
     const box = $("#arc-main");
     box.className = "tour-next panel";
-    // 勝ったあとのレベルアップ(1回ずつ)→ スキルの選択 → 次の敵
-    if (st.pending.length && st.pending[0].type !== "skill") {
+    // 勝ったあとのレベルアップ(1回ずつ)→ 手に入れたもの → スキルの選択 → 次の敵
+    const head = st.pending[0];
+    if (head && !["skill", "item", "boost", "dope"].includes(head.type)) {
       box.innerHTML = `<p class="tn-head">レベルアップ<span>画面をタップすると次へ進みます</span></p>`;
       playArcPending();
       return;
     }
-    if (st.pending.length) { renderSkillChoice(st); return; }
+    if (head && head.type === "item") { renderArcItem(st, head); return; }
+    if (head && head.type === "boost") { renderArcBoost(st, head); return; }
+    if (head && head.type === "dope") { renderArcDope(st, head); return; }
+    if (head) { renderSkillChoice(st); return; }
     if (st.done) { renderArcResult(st); return; }
     renderArcNext(st);
   }
   function renderLadder(st) {
-    $("#arc-ladder").innerHTML = Array.from({ length: A_.STAGES }, (_, i) => {
-      const n = i + 1;
-      const e = st.enemies[n];
-      const done = n <= st.cleared, now = n === st.stage && !st.done;
-      const sub = done && e ? UI.esc(e.name) : n === A_.EXTRA ? "イナ" : n >= A_.PROMOTED_FROM ? "上級職" : "";
-      return `<li class="${done ? "done" : ""}${now ? " now" : ""}${n === A_.EXTRA ? " extra" : ""}"><b>${n === A_.EXTRA ? "EX" : n}</b><small>${sub}</small>${n === A_.STAR_STAGE ? '<i class="arc-mark">★</i>' : n === A_.EXTRA ? '<i class="arc-mark arc-full">★★</i>' : ""}</li>`;
+    const n = A_.stagesOf(st), ike = A_.isIke(st);
+    const ol = $("#arc-ladder");
+    ol.classList.toggle("ike", ike);
+    ol.innerHTML = Array.from({ length: n }, (_, i) => {
+      const k = i + 1;
+      const e = st.enemies[k];
+      const done = k <= st.cleared, now = k === st.stage && !st.done;
+      const sub = done && e ? UI.esc(e.name) : arcStageLabel(st, k);
+      const boss = ike ? [A_.IKE.KNIGHT1, A_.IKE.FERAL, A_.IKE.BOSS, A_.IKE.ASHNARD].includes(k) : k === A_.EXTRA;
+      const mark = ike ? "" : k === A_.STAR_STAGE ? '<i class="arc-mark">★</i>' : k === A_.EXTRA ? '<i class="arc-mark arc-full">★★</i>' : "";
+      const bonus = ike && k === A_.IKE.ASHNARD; // v1.6.2:21体目は横いっぱいの枠
+      return `<li class="${done ? "done" : ""}${now ? " now" : ""}${boss ? " extra" : ""}${bonus ? " bonus" : ""}"><b>${!ike && k === A_.EXTRA ? "EX" : k}</b><small>${sub}</small>${mark}</li>`;
     }).join("");
   }
   function renderArcMe(st) {
@@ -1924,38 +2487,126 @@
   function renderArcNext(st) {
     const me = arcPlayer(), en = arcEnemy();
     saveArc();
-    const ex = st.stage === A_.EXTRA;
+    const ex = inaLimited(st);
     const mine = st.skillMode === "carry" ? chips(st.skills) : `<span class="muted">毎回ルーレット${ex ? "(2つ)" : ""}</span>`;
     const theirs = chips([en.skill, ...(en.extraSkills || [])]) || '<span class="muted">スキルなし</span>';
-    $("#arc-main").innerHTML = `<p class="tn-head">次の敵<span>${A_.stageName(st.stage)}${ex ? " ― 赤竜イナ" : ""} ・ Lv${en.arcadeLv}${!ex && st.stage >= A_.PROMOTED_FROM ? " ・ 上級職" : ""}</span></p>
+    const note = en.roundOne ? "ラウンド1だけ戦います。アイクが倒れなければクリア"
+      : en.roundLimit ? `${en.roundLimit}ラウンドまでに倒せないとゲームオーバー(負け1回)`
+        : en.phase2 ? "倒しても、まだ終わらない……"
+          : en.feral ? "ずっと化身している(化身ゲージ20のまま)" : "";
+    $("#arc-main").innerHTML = `<p class="tn-head">次の敵<span>${arcNextTitle(st, en)}</span></p>
       <div class="tn-vs">${arcFighter(me, mine, null)}<b class="tn-v">VS</b>${arcFighter(en, theirs, en.weapon)}</div>
       <div class="card-actions tn-buttons"><button type="button" class="btn btn-main" id="btn-arc-prep">バトル準備へ</button></div>
-      ${ex ? `<p class="tn-msg">イナ戦は3回まで(残り${A_.inaLeft(st)}回)</p>` : ""}${arcMsg ? `<p class="tn-msg">${arcMsg}</p>` : ""}`;
+      ${ex ? `<p class="tn-msg">イナ戦は3回まで(残り${A_.inaLeft(st)}回)</p>` : ""}${ashLimited(st) ? `<p class="tn-msg">アシュナード戦のコンティニューは${A_.IKE.ASH_CONTINUES}回まで(残り${A_.ashLeft(st)}回)</p>` : ""}${note ? `<p class="tn-msg">${note}</p>` : ""}${arcMsg ? `<p class="tn-msg">${arcMsg}</p>` : ""}`;
   }
   function renderSkillChoice(st) {
     const p = st.pending[0];
-    const head = { start: "最初のスキルを選ぶ", swap: "スキルを交換する", add: "2つ目のスキルを追加する" }[p.mode];
+    if (p.mode === "swap2" && arcSwapName) {
+      // v1.6.1:1つ目・2つ目のどちらと交換するか
+      const slotBtn = (i) => `<button type="button" class="arc-skill arc-slot" data-slot="${i}"><span class="as-top">${UI.skillChip(st.skills[i], false)}<small>${i + 1}つ目</small></span>
+        <span class="as-desc">${UI.esc(arcSkillDesc(st.skills[i], A_.isIke(st)))}</span></button>`;
+      $("#arc-main").innerHTML = `<p class="tn-head">スキルを交換する</p>
+        <p class="arc-note">${chips([arcSwapName])}を、どちらのスキルと交換しますか?</p>
+        <div class="arc-skills">${slotBtn(0)}${slotBtn(1)}</div>
+        <div class="card-actions tn-buttons"><button type="button" class="btn" id="btn-arc-swap-back">選び直す</button></div>`;
+      return;
+    }
+    const head = { start: "最初のスキルを選ぶ", swap: "スキルを交換する", swap2: "スキルを交換する", add: "2つ目のスキルを追加する", add3: "3つ目のスキルを追加する" }[p.mode];
     const note = p.mode === "start" ? "どちらか1つを選んでください。このスキルを持ち越して戦います。"
-      : p.mode === "add" ? `10体目を倒したので、2つ目のスキルとして追加できます(いまの${chips(st.skills)}はそのまま)。`
-        : `いまのスキル${chips(st.skills)}と交換できます。交換しなくてもかまいません。`;
+      : p.mode === "add3" ? `アシュナードとの戦いの前に、3つ目のスキルを1つ選べます(いまの${chips(st.skills)}はそのまま)。`
+      : p.mode === "add" ? `${st.cleared === A_.ADD_SKILL_STAGE ? `${A_.ADD_SKILL_STAGE}体目を倒したので、` : ""}2つ目のスキルとして追加できます(いまの${chips(st.skills)}はそのまま)。`
+        : p.mode === "swap2" ? `いまのスキル${chips(st.skills)}の、どちらかと交換できます。交換しなくてもかまいません。`
+          : `いまのスキル${chips(st.skills)}と交換できます。交換しなくてもかまいません。`;
     const opts = p.options.map((o) => {
       const s = UI.skillInfo(o.name);
       return `<button type="button" class="arc-skill${s && s.rare ? " rare" : ""}" data-skill="${UI.esc(o.name)}">
-        <span class="as-top">${UI.skillChip(o.name, false)}<small>${o.from === "enemy" ? "倒した敵のスキル" : "ランダム"}</small></span>
-        <span class="as-desc">${UI.esc(s ? s.description : "")}</span></button>`;
+        <span class="as-top">${UI.skillChip(o.name, false)}<small>${o.from === "enemy" ? "倒した敵のスキル" : o.from === "third" ? "3つ目" : o.from === "sure" ? "必ず出る" : "ランダム"}</small></span>
+        <span class="as-desc">${UI.esc(s ? arcSkillDesc(o.name, A_.isIke(st)) : "")}</span></button>`;
     }).join("");
-    const skip = p.mode === "start" ? "" : `<div class="card-actions tn-buttons"><button type="button" class="btn" id="btn-arc-skip">${p.mode === "add" ? "追加しない" : "交換しない"}</button></div>`;
-    $("#arc-main").innerHTML = `<p class="tn-head">${head}</p><p class="arc-note">${note}</p><div class="arc-skills">${opts}</div>${skip}`;
+    const skip = p.mode === "start" ? "" : `<div class="card-actions tn-buttons"><button type="button" class="btn" id="btn-arc-skip">${p.mode === "add" || p.mode === "add3" ? "追加しない" : "交換しない"}</button></div>`;
+    // v1.6.4:2つ目(3つ目)のスキルを追加できるときは、目立つ枠で知らせる(最初の1回は画面に大きく出す)
+    const adding = p.mode === "add" || p.mode === "add3";
+    const notice = adding ? `<div class="arc-add-notice"><b>${p.mode === "add3" ? "3" : "2"}つ目のスキルを追加できます!</b><span>いまのスキルはそのままで、スキルが1つ増えます。下から1つ選んでください。</span></div>` : "";
+    $("#arc-main").innerHTML = `<p class="tn-head">${head}</p>${notice}<p class="arc-note">${note}</p><div class="arc-skills">${opts}</div>${skip}`;
+    if (adding && !p.noticed) {
+      p.noticed = true;
+      saveArc();
+      runTalk([{ dark: "dim", ms: 300 }, { banner: "SKILL UP!", sub: `${p.mode === "add3" ? "3" : "2"}つ目のスキルを手に入れられる!`, cls: "clear skillup" }], { skippable: false });
+    }
+  }
+  // v1.6.1:手に入れた武器(アイクモードのラグネル)
+  let arcDiscard = null; // v1.6.1:手放す剣(4つを超えるとき)
+  function renderArcItem(st, p) {
+    const pc = arcPlayer();
+    const w = (p.mark ? DB.withMark(DB.weapons[p.weapon], p.mark) : UI.charWeapon(pc, p.weapon)) || DB.weapons[p.weapon];
+    const name = UI.esc(w ? w.name : "");
+    const forge = p.why === "forge";
+    const head = forge ? `${name}が錬成武器にパワーアップ!` : p.mark ? `${name}(錬成)を手に入れた!` : `${name}を手に入れた!`;
+    const note = forge ? "錬成されました(名前が緑・錬成の数値はランダム)。次の試合から使えます。"
+      : p.why === "ragnell" ? "神剣ラグネル。漆黒の騎士の鎧(エンブラの加護)を打ち破れる剣です。次の試合から使えます。"
+        : p.why === "regal" ? "アイク専用の剣。次の試合から使えます。"
+          : p.why === "laguz" ? "ラグズに特効の剣。次の試合から使えます。"
+            : p.why === "prayer" ? "スキル『祈り』付き。アイクの祈りは、HPが0になる攻撃を受けるとき、幸運の確率でHPが1残ります。"
+              : p.why === "forged" ? "錬成された剣です(錬成の数値はランダム)。次の試合から使えます。" : "倒した敵が使っていた武器です。次の試合から使えます。";
+    if (A_.needsDiscard(st)) {
+      // ラグネル以外の剣は4つまで:手放す剣を1つ選ぶ(新しい剣を選ぶと受け取らない)
+      const ids = A_.heldSwords(st).concat([p.weapon]);
+      if (!ids.includes(arcDiscard)) arcDiscard = null;
+      const card = (id) => {
+        const x = id === p.weapon ? w : UI.charWeapon(pc, id) || DB.weapons[id];
+        return `<button type="button" class="arc-discard${arcDiscard === id ? " on" : ""}" data-discard="${UI.esc(id)}">${id === p.weapon ? "<small>新しい剣</small>" : ""}${x ? UI.weaponCard(x) : ""}</button>`;
+      };
+      $("#arc-main").innerHTML = `<p class="tn-head">${head}</p>
+        <p class="arc-note">剣はラグネルのほかに${A_.WEAPON_LIMIT}つまで持てます。手放す剣を1つ選んでください(新しい剣を選ぶと受け取りません)。</p>
+        <div class="arc-discards">${ids.map(card).join("")}</div>
+        <div class="card-actions tn-buttons"><button type="button" class="btn btn-main" id="btn-arc-item"${arcDiscard ? "" : " disabled"}>${arcDiscard === p.weapon ? "受け取らない" : arcDiscard ? "手放して受け取る" : "手放す剣を選んでください"}</button></div>`;
+      return;
+    }
+    $("#arc-main").innerHTML = `<p class="tn-head">${head}</p>
+      <p class="arc-note">${note}</p>
+      <div class="arc-item">${w ? UI.weaponCard(w) : ""}</div>
+      <div class="card-actions tn-buttons"><button type="button" class="btn btn-main" id="btn-arc-item">次へ</button></div>`;
+  }
+  // v1.6.4:19体目のあと、ドーピングアイテム3つから1つを選ぶ
+  function renderArcDope(st, p) {
+    const cards = p.options.map((o, i) => {
+      const label = DB.STAT_LABELS[o.stat] || "HP";
+      const now = st.stats[o.stat];
+      return `<button type="button" class="arc-skill arc-dope" data-dope="${i}"><span class="as-top"><b class="dope-name">${UI.esc(o.item)}</b><small>${o.stat === "hp" ? "最大HP" : label}+${o.n}</small></span>
+        <span class="as-desc">${label} ${now} → <b class="up">${Math.min(now + o.n, (A_.capOf(st) || {})[o.stat] || 99)}</b></span></button>`;
+    }).join("");
+    $("#arc-main").innerHTML = `<p class="tn-head">ドーピングアイテムを1つ選ぶ</p>
+      <p class="arc-note">なりそこないを倒した!3つのアイテムから、1つだけ選んで使えます。</p>
+      <div class="arc-skills">${cards}</div>`;
+  }
+  // v1.6.1:能力値が上がるアイテム(天使の羽衣・エナジーの雫・女神の像・竜の盾)
+  function renderArcBoost(st, p) {
+    const label = DB.STAT_LABELS[p.stat] || "HP";
+    $("#arc-main").innerHTML = `<p class="tn-head">${UI.esc(p.item)}を手に入れた!</p>
+      <p class="arc-note">${p.stat === "hp" ? "最大HP" : label}が${p.to - p.from}上がった!</p>
+      <div class="arc-boost"><span>${label}</span><b>${p.from}</b><span>→</span><b class="up">${p.to}</b></div>
+      <div class="card-actions tn-buttons"><button type="button" class="btn btn-main" id="btn-arc-item">次へ</button></div>`;
   }
   function renderArcResult(st) {
-    const c = S.find(st.charId);
-    const title = st.result === "clear" ? "完全制覇" : st.stars ? "アーケード達成" : "アーケード終了";
-    const text = st.result === "clear" ? `EXTRAのイナを倒しました!${UI.esc(c.name)}の名前に★★が付きました。`
-      : st.result === "over" ? `イナに3回負けました。10体目まで勝ち抜いたので、${UI.esc(c.name)}の名前に★が付きました。`
-        : st.stars ? `${A_.stageName(st.stage)}であきらめました。10体目まで勝ち抜いたので、★が付いています。`
-          : `${A_.stageName(st.stage)}であきらめました(${st.cleared}体を倒した)。`;
+    const c = arcSaved(st);
+    const ike = A_.isIke(st);
     const box = $("#arc-main");
     box.className = "tour-next panel done";
+    let title, text;
+    if (ike) {
+      // v1.6.2:アシュナードを倒すと ALL CLEAR。コンティニューが4回以上のクリアには、21体目のヒント
+      title = st.allClear ? "アイクモード ALL CLEAR" : st.result === "clear" || st.result === "over" ? "アイクモード制覇" : "アイクモード終了";
+      text = st.allClear ? "狂王アシュナードを倒しました!アイクモード完全制覇です。"
+        : st.result === "over" ? `漆黒の騎士は倒しましたが、アシュナードに${A_.IKE.ASH_CONTINUES + 1}回負けました(アイクモード クリア)。`
+        : st.result === "clear" ? `漆黒の騎士を倒しました!アイクモード クリアです。<br><small class="muted">(コンティニュー${A_.IKE.BONUS_CONTINUES}回以内でクリアすると……?)</small>`
+          : `${A_.stageName(st.stage, st)}であきらめました(${st.cleared}体を倒した)。`;
+    } else {
+      title = st.result === "clear" ? "完全制覇" : st.stars ? "アーケード達成" : "アーケード終了";
+      text = st.result === "clear" ? `EXTRAのイナを倒しました!${UI.esc(c.name)}の名前に★★が付きました。`
+        : st.result === "over" ? `イナに3回負けました。10体目まで勝ち抜いたので、${UI.esc(c.name)}の名前に★が付きました。`
+          : st.stars ? `${A_.stageName(st.stage, st)}であきらめました。10体目まで勝ち抜いたので、★が付いています。`
+            : `${A_.stageName(st.stage, st)}であきらめました(${st.cleared}体を倒した)。`;
+    }
     box.innerHTML = `<p class="tn-head">アーケード終了</p>
       <div class="tn-champ">${UI.charIcon(c, "large")}<div><small>${title}</small><b>${UI.esc(c.name)}</b><span>${st.stars ? `<i class="arc-mark${st.stars >= 2 ? " arc-full" : ""}">${"★".repeat(st.stars)}</i> ` : ""}${st.cleared}体を倒した ・ コンティニュー${st.continues}回</span></div></div>
       <p class="arc-note">${text}</p>
@@ -1966,8 +2617,8 @@
   async function playArcPending() {
     if (arcPlaying) return;
     arcPlaying = true;
-    const saved = S.find(arcState.charId);
-    while (arcState && arcState.pending.length && arcState.pending[0].type !== "skill") {
+    const saved = arcSaved();
+    while (arcState && arcState.pending.length && !["skill", "item", "boost", "dope"].includes(arcState.pending[0].type)) {
       await levelStep(arcState.pending[0], saved);
       if (!arcState) break;
       arcState.pending.shift();
@@ -2023,21 +2674,55 @@
   $("#screen-arcade").addEventListener("click", (e) => {
     const t = e.target;
     const sk = t.closest(".arc-skill");
+    const dope = t.closest(".arc-dope");
+    if (dope) {
+      if (A_.chooseDope(arcState, Number(dope.dataset.dope))) { saveArc(); renderArcade(); }
+      return;
+    }
     if (t.id === "btn-arc-prep") {
       if (!arcState || arcState.done) return;
       arcMatch = { stage: arcState.stage };
       arcMsg = "";
       goto("prep");
-    } else if (sk) {
-      const name = sk.dataset.skill;
-      const mode = arcState.pending[0] && arcState.pending[0].mode;
-      if (A_.chooseSkill(arcState, name)) {
-        arcMsg = mode === "add" ? `『${UI.esc(name)}』を2つ目のスキルとして追加しました。` : mode === "swap" ? `『${UI.esc(name)}』に交換しました。` : `『${UI.esc(name)}』で戦います。`;
+    } else if (sk && sk.dataset.slot != null) {
+      // v1.6.1:1つ目・2つ目のどちらと交換するか
+      const slot = Number(sk.dataset.slot);
+      const old = arcState.skills[slot];
+      if (A_.chooseSkill(arcState, arcSwapName, slot)) {
+        arcMsg = `『${UI.esc(old)}』を『${UI.esc(arcSwapName)}』に交換しました。`;
+        arcSwapName = null;
         saveArc();
         renderArcade();
       }
+    } else if (sk) {
+      const name = sk.dataset.skill;
+      const mode = arcState.pending[0] && arcState.pending[0].mode;
+      if (mode === "swap2") { arcSwapName = name; renderArcade(); return; }
+      if (A_.chooseSkill(arcState, name)) {
+        arcMsg = mode === "add3" ? `『${UI.esc(name)}』を3つ目のスキルとして追加しました。` : mode === "add" ? `『${UI.esc(name)}』を2つ目のスキルとして追加しました。` : mode === "swap" ? `『${UI.esc(name)}』に交換しました。` : `『${UI.esc(name)}』で戦います。`;
+        saveArc();
+        renderArcade();
+      }
+    } else if (t.id === "btn-arc-swap-back") {
+      arcSwapName = null;
+      renderArcade();
     } else if (t.id === "btn-arc-skip") {
+      // v1.6.2:「追加しない」は、もう一度押すまで確かめる(2つ目のスキルは、あとから追加できないため)
+      const p0 = arcState.pending[0];
+      if (p0 && (p0.mode === "add" || p0.mode === "add3") && t.dataset.confirm !== "1") {
+        t.dataset.confirm = "1";
+        t.textContent = "本当に追加しない?(もう一度押す)";
+        return;
+      }
+      arcSwapName = null;
       if (A_.chooseSkill(arcState, null)) { arcMsg = "スキルはそのままです。"; saveArc(); renderArcade(); }
+    } else if (t.id === "btn-arc-item") {
+      if (A_.takeItem(arcState, arcDiscard)) {
+        arcDiscard = null; saveArc(); renderArcade();
+      }
+    } else if (t.closest && t.closest("[data-discard]")) {
+      arcDiscard = t.closest("[data-discard]").dataset.discard;
+      renderArcade();
     } else if (t.id === "btn-arc-new") {
       clearArc();
       goto("asetup");
@@ -2049,6 +2734,7 @@
   });
 
   // 試合が終わったら記録する。勝てば次へ(レベルアップ)、負ければコンティニュー/あきらめる
+  // v1.6.1:クリア・ゲームオーバー・会話の演出があれば、その演出(Promise を返す関数)を返す
   function arcFinished(e) {
     const t = battle.arc;
     battle.arc = null;
@@ -2060,28 +2746,55 @@
     btnG.dataset.confirm = ""; btnG.textContent = "あきらめる";
     btnN.textContent = "アーケード画面へ";
     text.textContent = "";
-    if (!st || st.done || st.stage !== t.stage) return; // もう記録済み
-    const saved = S.find(st.charId);
+    if (!st || st.done || st.stage !== t.stage) return null; // もう記録済み
+    const saved = arcSaved(st);
     const stage = t.stage;
+    const ike = A_.isIke(st), I = A_.IKE;
+    let seq = null;
     if (e.winner === "left") {
       A_.win(st, saved, battleRng);
-      if (st.stars) S.markArcade(st.charId, st.stars);
-      const ups = st.pending.filter((p) => p.type !== "skill").length;
-      text.innerHTML = stage === A_.EXTRA ? `イナを倒した!アーケード完全制覇 <i class="arc-mark arc-full">★★</i>`
-        : stage === A_.STAR_STAGE ? `10体目を倒した!${UI.esc(saved.name)}の名前に<i class="arc-mark">★</i>が付きました。次はEXTRA(赤竜イナ)`
-          : `${A_.stageName(stage)}を倒した!${ups ? `レベルが${ups}つ上がります` : ""}`;
-      btnN.textContent = "次へ";
+      if (!ike && st.stars) S.markArcade(st.charId, st.stars);
+      const ups = st.pending.filter((p) => p.type === "levelup").length;
+      const cc = st.pending.some((p) => p.type === "classchange");
+      const upText = cc ? `${st.className}にクラスチェンジします` : ups ? `レベルが${ups}つ上がります` : "";
+      if (ike) {
+        text.innerHTML = stage === I.KNIGHT1 ? `漆黒の騎士の攻撃に耐えた!ステージクリア。${upText}`
+          : stage === I.ASHNARD ? "アシュナードを倒した!アイクモード ALL CLEAR"
+          : stage === I.BOSS ? (st.bonus ? `漆黒の騎士を倒した!コンティニュー${I.BONUS_CONTINUES}回以内のクリアで、21体目に挑戦できます` : "漆黒の騎士を倒した!アイクモード クリア")
+            : `${A_.stageName(stage, st)}を倒した!${st.pending.filter((p) => p.type === "item" || p.type === "boost").map((p) => p.type === "boost" ? `${p.item}を手に入れた。` : p.mark ? `${DB.weapons[p.weapon].name}(錬成)を手に入れた。` : p.why === "forge" ? `${DB.weapons[p.weapon].name}が錬成された。` : `${DB.weapons[p.weapon].name}を手に入れた。`).join("")}${upText}`;
+        if (stage === I.KNIGHT1) seq = () => runTalk(knightSurviveScript());
+        if (stage === I.BOSS) seq = () => runTalk(bossDefeatScript(st.bonus));
+        if (stage === I.ASHNARD) seq = () => runTalk(ashnardEndScript(), { skippable: false });
+      } else {
+        text.innerHTML = stage === A_.EXTRA ? `イナを倒した!アーケード完全制覇 <i class="arc-mark arc-full">★★</i>`
+          : stage === A_.STAR_STAGE ? `10体目を倒した!${UI.esc(saved.name)}の名前に<i class="arc-mark">★</i>が付きました。次はEXTRA(赤竜イナ)`
+            : `${A_.stageName(stage, st)}を倒した!${upText}`;
+        // v1.6.1:10体目・EXを倒したときのクリア演出
+        if (stage === A_.STAR_STAGE) seq = () => runTalk(clearScript("STAGE CLEAR", `10体目を撃破!${saved.name}に ★`), { skippable: false });
+        if (stage === A_.EXTRA) seq = () => runTalk(clearScript("ALL CLEAR", `EXTRAのイナを撃破!${saved.name}に ★★`), { skippable: false });
+      }
+      btnN.textContent = st.done ? "結果を見る" : "次へ";
     } else {
       A_.lose(st);
       if (st.done) {
-        text.textContent = "イナに3回負けました。アーケード終了(10体目までの★はそのまま)";
+        text.textContent = ike ? `アシュナードに${A_.IKE.ASH_CONTINUES + 1}回負けました。アイクモード終了(20体目まではクリア)` : "イナに3回負けました。アーケード終了(10体目までの★はそのまま)";
         btnN.textContent = "結果を見る";
+        // v1.6.4:アシュナード戦で負けたときは、アイクの散り際のセリフ
+        seq = () => runTalk([...(ike && stage === I.ASHNARD ? ikeFallScript() : []), ...gameOverScript()], { skippable: false });
       } else {
-        text.textContent = stage === A_.EXTRA ? `負けてしまった…(イナ戦 残り${A_.inaLeft(st)}回)` : "負けてしまった…コンティニューできます(同じ敵ともう一度)";
+        text.textContent = inaLimited(st) ? `負けてしまった…(イナ戦 残り${A_.inaLeft(st)}回)` : ashLimited(st) ? `負けてしまった…(アシュナード戦 コンティニュー残り${A_.ashLeft(st)}回)` : "負けてしまった…コンティニューできます(同じ敵ともう一度)";
         btnC.hidden = false; btnG.hidden = false; btnN.hidden = true;
+        if (ike && stage === I.KNIGHT1) seq = () => runTalk(knightDefeatScript());
+        if (ike && stage === I.ASHNARD) seq = () => runTalk(ikeFallScript()); // v1.6.4:アイクの散り際のセリフ
+        // v1.6.2:20体目の漆黒の騎士を10ラウンドまでに倒せなかった → ゲームオーバー(負け1回。コンティニューできる)
+        if (ike && e.timeOut) {
+          text.textContent = `${I.BOSS_ROUNDS}ラウンドまでに漆黒の騎士を倒せなかった…コンティニューできます(同じ敵ともう一度)`;
+          seq = () => runTalk(gameOverScript(), { skippable: false });
+        }
       }
     }
     saveArc();
+    return seq;
   }
   $("#btn-arc-continue").addEventListener("click", () => {
     if (!arcState || arcState.done) { goto("arcade"); return; }
@@ -2089,17 +2802,252 @@
     goto("prep");
   });
   $("#btn-arc-next").addEventListener("click", () => goto("arcade"));
-  $("#btn-arc-giveup").addEventListener("click", (e) => {
+  // v1.6.1:あきらめる → 画面はそのまま、暗転して GAME OVER → タップでアーケード画面(結果)へ
+  $("#btn-arc-giveup").addEventListener("click", async (e) => {
     const b = e.currentTarget;
     if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "本当にあきらめる?(もう一度押す)"; return; }
-    if (arcState && !arcState.done) { A_.giveUp(arcState); saveArc(); }
+    if (!arcState || arcState.done) { goto("arcade"); return; }
+    A_.giveUp(arcState);
+    saveArc();
+    $("#battle-result").hidden = true;
+    await runTalk(gameOverScript(), { skippable: false, keepDark: true });
     goto("arcade");
+    await talkDark(false);
+    $("#talk").hidden = true;
   });
+
+  // ================= v1.6.1:会話・暗転・クリア/ゲームオーバーの演出 =================
+  // 台本(steps)の1つ1つ:
+  //   { who, text }   … 会話(タップで次へ)
+  //   { dark: true|false|"dim", ms } … 暗転(dim は半分暗く)/ 暗転から戻る
+  //   { wait: ms }    … 待つ
+  //   { banner, sub, cls } … STAGE CLEAR などの大きな文字(タップで次へ)
+  //   { fn, hide }    … 関数を実行(hide:演出の幕を外して、後ろの画面を見せる。スキップすると実行しない)
+  // スキップ:会話・イベントを飛ばす(暗転・大きな文字は出す)
+  const talkEl = $("#talk");
+  let talkWake = null, talkSkip = false;
+  talkEl.addEventListener("click", (e) => {
+    if (e.target.id === "talk-skip") { talkSkip = true; $("#talk-skip").hidden = true; }
+    if (talkWake) talkWake();
+  });
+  // v1.6.3:キーボードでも会話を進める・飛ばす(Enter・スペースで次へ、Esc でスキップ)
+  document.addEventListener("keydown", (e) => {
+    if (talkEl.hidden) return;
+    if (e.key === "Escape" && !$("#talk-skip").hidden) { talkSkip = true; $("#talk-skip").hidden = true; if (talkWake) talkWake(); }
+    else if ((e.key === "Enter" || e.key === " ") && talkWake) { e.preventDefault(); talkWake(); }
+  });
+  function talkWait(ms) {
+    return new Promise((resolve) => {
+      let t = null;
+      const done = () => { clearTimeout(t); talkWake = null; resolve(); };
+      talkWake = ms == null ? done : null; // 時間で進むものはタップで早めない(暗転など)
+      if (ms != null) t = setTimeout(done, reduceMotion() ? Math.min(ms, 200) : ms);
+    });
+  }
+  async function talkDark(on, ms = 700) {
+    const d = $("#talk-dark");
+    talkEl.hidden = false;
+    d.classList.toggle("dim", on === "dim");
+    d.classList.toggle("on", !!on);
+    await talkWait(ms);
+  }
+  async function runTalk(steps, opts = {}) {
+    steps = splitTalk(steps); // v1.6.4:3行ずつ
+    const skippable = opts.skippable !== false;
+    talkSkip = false;
+    talkEl.hidden = false;
+    talkEl.classList.remove("hide");
+    $("#talk-skip").hidden = !skippable;
+    const box = $("#talk-box"), banner = $("#talk-banner");
+    for (const st of steps) {
+      if (st.who !== undefined) {
+        if (talkSkip) continue;
+        box.hidden = false;
+        box.classList.toggle("narration", !st.who);
+        $("#talk-name").textContent = st.who;
+        $("#talk-name").hidden = !st.who;
+        const p = $("#talk-text");
+        p.textContent = st.text;
+        p.classList.remove("in"); void p.offsetWidth; p.classList.add("in");
+        await talkWait(null);
+        continue;
+      }
+      box.hidden = true;
+      if (st.dark !== undefined) { await talkDark(st.dark, st.ms ?? 700); continue; }
+      if (st.wait) { if (!talkSkip) await talkWait(st.wait); continue; }
+      if (st.banner) {
+        banner.className = "talk-banner " + (st.cls || "");
+        banner.innerHTML = `<b>${UI.esc(st.banner)}</b>${st.sub ? `<small>${UI.esc(st.sub)}</small>` : ""}<em>タップで次へ</em>`;
+        banner.hidden = false;
+        $("#talk-skip").hidden = true;
+        await talkWait(900);
+        await talkWait(null);
+        banner.hidden = true;
+        $("#talk-skip").hidden = !skippable || talkSkip;
+        continue;
+      }
+      if (st.fn) {
+        if (talkSkip && st.skippable !== false) continue;
+        if (st.hide) talkEl.classList.add("hide");
+        await st.fn();
+        talkEl.classList.remove("hide");
+      }
+    }
+    box.hidden = true;
+    banner.hidden = true;
+    $("#talk-skip").hidden = true;
+    if (opts.keepDark) return;
+    await talkDark(false, 500);
+    talkEl.hidden = true;
+  }
+  const say = (who, text) => ({ who, text });
+  // v1.6.4:セリフは3行ずつに区切る(4行以上のセリフは、行数がなるべく同じになるように2つ以上の箱に分ける)
+  function splitLines(text) {
+    const lines = String(text).split("\n");
+    if (lines.length <= 3) return [text];
+    const n = Math.ceil(lines.length / 3), out = [];
+    let i = 0;
+    for (let k = 0; k < n; k++) {
+      const size = Math.ceil((lines.length - i) / (n - k));
+      out.push(lines.slice(i, i + size).join("\n"));
+      i += size;
+    }
+    return out;
+  }
+  const splitTalk = (steps) => steps.flatMap((st) => (st && st.who !== undefined ? splitLines(st.text).map((text) => ({ ...st, text })) : [st]));
+  const KNIGHT = "漆黒の騎士", IKE_ = "アイク", ASH = "アシュナード";
+  const clearScript = (title, sub) => [{ dark: "dim" }, { banner: title, sub, cls: "clear" }];
+  const gameOverScript = () => [{ dark: true, ms: 1200 }, { banner: "GAME OVER", cls: "over" }];
+  // 11体目:漆黒の騎士(戦いの前のセリフ。パターン1は50%、2は10%、3・4は20%)
+  function knightOpeningScript() {
+    const r = battleRng.next();
+    if (r < 0.1) {
+      return [
+        say(KNIGHT, "やあ、(´・ω・`)ようこそ、しっこくハウスへ。"),
+        say(KNIGHT, "このエタルドはサービスだから、まずは喰らって死んで欲しい。"),
+        say(KNIGHT, "うん、「絶対に勝てない」んだ。済まない。"),
+        say(KNIGHT, "仏の顔もって言うしね、謝って許してもらおうとも思っていない。"),
+        say(KNIGHT, "でも、このパラメータを見たとき、君は、\nきっと言葉では言い表せない 「絶望」みたいなものを感じてくれたと思う。"),
+        say(KNIGHT, "殺伐とした世の中でそういう気持ちを忘れないで欲しい、\nそう思ってこの攻撃をしかけたんだ。"),
+        say(KNIGHT, "______________じゃあ、リセットしようか。"),
+      ];
+    }
+    if (r < 0.3) return [say(KNIGHT, "…貴様ごときに\n私の相手が務まると思ったか？\n身の程をわきまえよ。")];
+    if (r < 0.5) return [say(KNIGHT, "…この程度の兵力に、てこずるとは…\n私の見込み違いということか？"), say(IKE_, "…！！\nあいつは…！")];
+    return [
+      say(KNIGHT, "また会ったな、小僧。"),
+      say(IKE_, "……"),
+      say(KNIGHT, "何故、仕掛けてくる？\nおまえでは私の敵にはならん。\n全力で逃げるべきではないのか？"),
+      say(IKE_, "うっ…\nうおおおおおお！"),
+      say(KNIGHT, "…愚か者め。"),
+    ];
+  }
+  // v1.6.2:アイクとミストの会話(11体目のあと)は削除
+  // 11体目:ラウンド1を耐えた(パターン1は80%、パターン2は20%)
+  function knightSurviveScript() {
+    const talk = battleRng.next() < 0.2
+      ? [say(IKE_, "…っ…なぜだ…\nオレの攻撃が…きかない…？"), say(KNIGHT, "かなり、やる。\nだが、私の敵ではないな。")]
+      : [say(KNIGHT, "……ほぅ　かわしたか。\nだが…次はどうだ？"), say(IKE_, "！！")];
+    return [...talk, { dark: true, ms: 900 }, { banner: "STAGE CLEAR", sub: "漆黒の騎士の攻撃に耐えた", cls: "clear" }];
+  }
+  // 11体目:アイクが倒された
+  const knightDefeatScript = () => [
+    say(IKE_, "ぐっうっ…\n……俺の…力では………\n…………ま………だ………"),
+    say(KNIGHT, "……その程度の腕で、\n私に敵うとでも思ったか？\n時に退くことも知らぬようでは……\nどのみち、生き残れなかったろうがな。"),
+    ...gameOverScript(),
+  ];
+  // v1.6.2:戦いの前の会話(11体目・20体目の漆黒の騎士、21体目のアシュナード)。ないときは null
+  function arcOpening() {
+    if (!arcState || !A_.isIke(arcState)) return null;
+    const en = arcEnemy(), I = A_.IKE;
+    if (en.roundOne) return knightOpeningScript();
+    if (arcState.stage === I.BOSS) return bossOpeningScript();
+    if (arcState.stage === I.ASHNARD) return ashnardOpeningScript();
+    return null;
+  }
+  // 20体目:戦いの前の会話(v1.6.2:イナと漆黒の騎士・そのあとのアイクとの会話、イナが倒されるイベントは削除。ここだけ残す)
+  const bossOpeningScript = () => [
+    say(KNIGHT, "奇妙な縁だな……\n貴様との勝負はこれが３度目か。\n１度目はガリアの森……\n２度目はクリミアのデルブレー……"),
+    say(IKE_, "ああ。\n俺は２度戦い、２度負けた。\nだが――\nこの３度目は、違う。"),
+    say(KNIGHT, "ほう……"),
+    say(IKE_, "…幼い頃から、親父に基礎を\n叩き込まれた俺の剣技は……\n極めれば…誰にも負けるはずがない。"),
+    say(KNIGHT, "…貴様の父親を倒した私に、\n同じ剣技は通用しないと……\n考えなかったのか？"),
+    say(IKE_, "親父は……！\n利き手を封じていた。\nそうでなければ…おまえに\n負けはしなかったはずだ……"),
+    say(KNIGHT, "……フッ　そういうことか。\nでは、試してみよう。\nガウェインの剣技の後継者よ…\nその力、この私に見せてみよ！"),
+  ];
+  // v1.6.2:21体目 アシュナード(戦いの前の会話)
+  const ashnardOpeningScript = () => [
+    say(IKE_, "………"),
+    say(ASH, "くくく　その構え…\nよく覚えておるぞ……\n父親の剣技を継いだか。\n実に良いぞ……"),
+    say(IKE_, "狂王アシュナード！\nこの剣で…おまえを倒し…\n戦いを終わらせる。"),
+    say(ASH, "おまえが我を…\n力持って制するというなら、\n望むところだ……\nそれこそが我の理想とする\n世界の在りかたというものだからな。"),
+    say(IKE_, "…なんだと？"),
+  ];
+  // v1.6.2:変身前のアシュナードを倒した(戦闘画面のまま)
+  const ashnardDownScript = () => [
+    say(ASH, "……我が敗れる、か。\nく…"),
+    say(ASH, "くくくくくくくく\nだが、まだだ。\nまだ、おまえの力、見尽くしてはおらぬ。"),
+    say(IKE_, "……何をする気だ？"),
+    say(ASH, "今こそ、これを使う時ぞ……"),
+    say(IKE_, "まさか……"),
+  ];
+  // v1.6.2:変身後のアシュナード(そのまま戦いの前の会話 → 次のラウンドへ)
+  const ashnardRiseScript = () => [
+    say(ASH, "…ふしゅぅぅぅうううう…\n……………………\n………よい心地だ………"),
+    say(IKE_, "メダリオンを手にして…\nまだ、正気を……？"),
+    say(ASH, "くくくくくくく\n……………参る……"),
+  ];
+  // v1.6.4:変身後のアシュナードを倒した → アシュナードのセリフ → 消滅の演出 → アイクのセリフ → フェードアウト → ALL CLEAR
+  const ashnardEndScript = () => [
+    say(ASH, "くく……良い……\n良いぞ、実に良い！\nもっと……もっとだ……！"),
+    say(ASH, "この至上の時は、\nまだ……まだ……"),
+    { fn: () => ashnardVanish(), hide: true, skippable: false },
+    say(IKE_, "……これで本当に終わりだ。"),
+    { dark: true, ms: 1600 },
+    { banner: "ALL CLEAR", sub: "狂王アシュナードを撃破!アイクモード完全制覇", cls: "clear" },
+  ];
+  // v1.6.4:アシュナード戦でアイクが倒れたときの、散り際のセリフ
+  const ikeFallScript = () => [say(IKE_, "畜生……っ！　俺は……\nここまで来て……！\n……すまない、エリンシア……")];
+  // v1.6.4:アシュナードの消滅の演出(赤黒い光に包まれ、灰のように崩れて消える)
+  async function ashnardVanish() {
+    const el = fighterEl("right");
+    if (!el) return;
+    const arena = $("#arena");
+    arena.classList.remove("slowmo", "ko-dim", "ss-dim");
+    el.classList.remove("loser", "ko-target");
+    flash(el, "vanish-fx");
+    const layer = $(".float-layer", el);
+    if (layer) {
+      const box = document.createElement("span");
+      box.className = "vanish-ash";
+      box.innerHTML = Array.from({ length: 24 }, (_, i) => `<i style="left:${4 + ((i * 37) % 92)}%;top:${10 + ((i * 53) % 70)}%;--dx:${((i * 29) % 80) - 40}px;animation-delay:${(i % 8) * 0.12}s"></i>`).join("");
+      layer.appendChild(box);
+    }
+    await new Promise((r) => setTimeout(r, reduceMotion() ? 300 : 2600));
+    el.classList.add("vanished");
+  }
+  // 20体目:漆黒の騎士を倒した(v1.6.2:コンティニュー3回以内なら STAGE CLEAR → 21体目へ)
+  const bossDefeatScript = (bonus) => [
+    say(KNIGHT, "…強くなったな……\n褒めてやろう……"),
+    say(IKE_, "………親父………\n……俺は……やった……\nあいつを倒した……\n親父…………"),
+    { dark: true, ms: 1200 },
+    bonus ? { banner: "STAGE CLEAR", sub: "漆黒の騎士を撃破 ― 21体目へ", cls: "clear" } : { banner: "CLEAR", sub: "アイクモード クリア", cls: "clear" },
+  ];
+  // ---- バトル準備・バトルとのつなぎ(アーケード) ----
+  function arcPrepInfo() {
+    const st = arcState, ex = inaLimited(st);
+    const en = arcEnemy();
+    const extra = A_.isIke(st) ? (en.roundOne ? "(漆黒の騎士・ラウンド1だけ)" : st.stage === A_.IKE.BOSS ? "(漆黒の騎士・10ラウンドまで)" : st.stage === A_.IKE.ASHNARD ? "(狂王アシュナード)" : st.stage === A_.IKE.FERAL ? "(なりそこない)" : "") : ex ? "(赤竜イナ)" : "";
+    $("#tour-info").innerHTML = `<p class="ti-round">${A_.isIke(st) ? "アイクモード ・ " : ""}${A_.stageName(st.stage, st)}${extra} / 全${A_.stagesOf(st)}戦</p>
+        <p class="ti-rule">1本先取 ・ スキル:${arcSkillModeText(st.skillMode)} ・ ${ex ? `イナ戦 残り${A_.inaLeft(st)}回` : ashLimited(st) ? `コンティニュー 残り${A_.ashLeft(st)}回` : `コンティニュー${st.continues}回`}</p>
+        <button type="button" class="link-btn" data-goto="arcade">アーケード画面へ戻る</button>`;
+  }
 
   $("#btn-start").addEventListener("click", () => startBattle());
   $("#btn-skip").addEventListener("click", () => {
     battle.skip = true;
     $("#arena-fx").innerHTML = "";
+    ougiEnd(); // v1.6.4
     endKo();
     if (battle.wake) battle.wake();
   });

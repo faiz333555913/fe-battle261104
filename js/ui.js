@@ -121,7 +121,8 @@
     const human = char.race === "ラグズ" && char.statsHuman && form === "human";
     return {
       stats: human ? char.statsHuman : char.stats,
-      max: cls ? (human ? cls.max : cls.transformedMax || cls.max) : null,
+      // v1.6.1:職業の表にない(漆黒の騎士など)ときは char.maxStats、上級職は上級職の上限
+      max: cls ? (human ? cls.max : cls.transformedMax || cls.max) : char.maxStats || DB.classMaxOf(char.className),
     };
   }
 

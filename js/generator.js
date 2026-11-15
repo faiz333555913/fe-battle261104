@@ -6,7 +6,10 @@
   const DB = global.GameDB;
 
   const GENERATOR_VERSION = 2; // v1.2.0:性別・種族を追加
-  const MARKS_VERSION = 3; // v1.4.4:印の対象に手槍・手斧・どく系を追加。v1.4.5:キラー系が★3になり、持っていると錬成(印)が付かなくなった
+  // v1.6.1:錬成の範囲を変更(威力0〜5・命中0〜25・必殺0〜10・重さ0〜5)。前に作ったキャラも決め直す
+  // v1.6.4:錬成の対象にスキル付きの武器・エル魔法を追加(スキル付きの武器は★2になったので、持っていても錬成がつく)。前に作ったキャラも決め直す
+  // v1.6.5:長弓・蛇毒のナイフ・待ち伏せのダガー(スキル付き)が錬成の対象に。前に作ったキャラも決め直す
+  const MARKS_VERSION = 6;
 
   // ---- 入力の正規化とチェック ----
   // 戻り値: { ok: true, value } または { ok: false, errors: {項目: メッセージ} }
@@ -61,11 +64,10 @@
   function generateCharacter(inputs) {
     const key = seedKey(inputs);
     const rng = global.Rng.createSeededRng(key);
-    const month = +inputs.birthdate.slice(4, 6);
     const day = +inputs.birthdate.slice(6, 8);
 
-    // 属性:誕生月
-    const element = C.monthElement[month];
+    // 属性:v1.6.5 から誕生月ではなく、入力すべてから決まる別の乱数で決める(誕生日だけ変えて選べないように)
+    const element = elementOf(inputs);
 
     // 職業:性別・種族で絞り、好きな色で出やすさに偏り
     const colorDef = C.colors.find((c) => c.name === inputs.color);
@@ -111,7 +113,9 @@
     if (isLaguz) {
       weapons = [cls.fixedWeapon];
     } else {
-      let pool = cls.weaponCategories.flatMap((cat) => DB.weaponsByCategory[cat] || []);
+      // v1.6.5:職業専用の武器(onlyClasses)は、その職業のときだけ
+      let pool = cls.weaponCategories.flatMap((cat) => DB.weaponsByCategory[cat] || [])
+        .filter((w) => !w.onlyClasses || w.onlyClasses.includes(DB.baseClassName(cls.name)));
       const prefix = Object.keys(C.weaponCountByClassPrefix).find((p) => cls.name.startsWith(p));
       const count = Math.min(prefix ? C.weaponCountByClassPrefix[prefix] : C.weaponCountDefault, pool.length);
       const picked = [];
@@ -153,6 +157,13 @@
     return char;
   }
 
+  // v1.6.5:属性。キャラ本体とは別の乱数(能力値・武器の決まり方は変わらない)。出やすさは C.elementWeights
+  function elementOf(inputs) {
+    const rng = global.Rng.createSeededRng(seedKey(inputs) + "|element");
+    const list = Object.keys(C.elementWeights);
+    return rng.weightedPick(list, (e) => C.elementWeights[e]);
+  }
+
   // ---- v1.4.3:武器の印 ----
   // キャラの入力から決まる(キャラ本体の乱数とは別の乱数なので、これまでの能力値・武器は変わらない)。
   // 戻り値:{ 武器id: { might, hit, crit, weight } }(印がなければ {})
@@ -179,6 +190,17 @@
     return char;
   }
 
+  // v1.6.5:名前が変わった武器(ポイズンニードル → 蛇毒のナイフ、シャドウエッジ → 待ち伏せのダガー)を新しい名前にする。変わったら true
+  function renameWeapons(char) {
+    if (!char || !Array.isArray(char.weapons)) return false;
+    const R = DB.weaponRenames || {};
+    let changed = false;
+    char.weapons = char.weapons.map((id) => { if (R[id]) { changed = true; return R[id]; } return id; });
+    if (char.weapon && R[char.weapon]) { char.weapon = R[char.weapon]; changed = true; }
+    if (changed) { delete char.marksVersion; ensureMarks(char); }
+    return changed;
+  }
+
   // v1.4.4:ラグズの化身後の能力値を、化身前の能力値 + 今の化身の上がり幅で計算し直す(虎の速さ+1 を作成済みのキャラにも反映)。
   // 何度呼んでも同じ結果。変わったら true
   function refreshLaguzStats(char) {
@@ -193,5 +215,5 @@
     return changed;
   }
 
-  global.Generator = { normalizeInputs, generateCharacter, seedKey, classPool, weaponMarks, ensureMarks, needsMarks, refreshLaguzStats, GENERATOR_VERSION };
+  global.Generator = { elementOf, renameWeapons, normalizeInputs, generateCharacter, seedKey, classPool, weaponMarks, ensureMarks, needsMarks, refreshLaguzStats, GENERATOR_VERSION };
 })(window);

@@ -11,6 +11,9 @@
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <title>闘技場バトル</title>
 <link rel="stylesheet" href="css/style.css">
+<!-- v1.6.6:スマホ縦向きのバトル準備・バトル(portrait_auto.css は tools/build_portrait_css.py が作る) -->
+<link rel="stylesheet" href="css/portrait_auto.css">
+<link rel="stylesheet" href="css/portrait.css">
 </head>
 <body>
 
@@ -26,20 +29,22 @@
       <div class="title-box">
         <p class="title-sub">― 名前に宿る力で戦え ―</p>
         <h1 class="title-heading">闘技場バトル</h1>
-        <p class="version">v1.6.0</p>
+        <p class="version">v1.6.6</p>
         <button type="button" class="press-start" id="press-start">Press click</button>
         <nav class="title-menu">
           <button type="button" class="btn btn-main slide-l" data-goto="create">キャラ作成</button>
           <button type="button" class="btn btn-main slide-r" data-goto="list">キャラ一覧</button>
           <button type="button" class="btn btn-main slide-l" id="btn-battle-mode">バトル</button>
           <button type="button" class="btn btn-main slide-r" data-goto="howto">遊び方</button>
+          <!-- v1.6.4:データ集(武器・スキル・職業・属性の一覧) -->
+          <button type="button" class="btn btn-main slide-l" data-goto="data">データ集</button>
         </nav>
         <!-- v1.5.0:バトルを押すと、メニューが左右の端に引っ込み、モードが左右から出てくる -->
         <!-- v1.6.0:動きはタイトルのメニュー(キャラ作成〜遊び方)と同じ。全部の項目が同じタイミングでスライドする。アーケードを追加 -->
         <nav class="mode-menu" aria-label="バトルのモード">
           <button type="button" class="btn btn-main mode-btn slide-l" id="btn-mode-arena"><b>闘技場</b><small>1対1で戦う</small></button>
           <button type="button" class="btn btn-main mode-btn slide-r" id="btn-mode-tour"><b>トーナメント</b><small id="tour-mode-note">8〜16人で順位を決める</small></button>
-          <button type="button" class="btn btn-main mode-btn slide-l" id="btn-mode-arcade"><b>アーケード</b><small id="arc-mode-note">1人で11連戦を勝ち抜く</small></button>
+          <button type="button" class="btn btn-main mode-btn slide-l" id="btn-mode-arcade"><b>アーケード</b><small id="arc-mode-note">1人で連戦を勝ち抜く</small></button>
           <button type="button" class="btn mode-back slide-r" id="btn-mode-back">もどる</button>
         </nav>
       </div>
@@ -111,16 +116,28 @@
     <!-- バトル準備 -->
     <section id="screen-prep" class="screen">
       <h2 class="screen-title" id="prep-title">バトル準備</h2>
+      <!-- v1.6.6:スマホ縦向きだけ、1P・2P・対戦(戦闘予測)をタブで切りかえる -->
+      <div class="pt-tabs" id="pt-tabs" role="tablist" aria-label="表示の切りかえ">
+        <button type="button" class="pt-tab on" data-ptab="left">1P<small id="pt-name-left"></small></button>
+        <button type="button" class="pt-tab" data-ptab="right">2P<small id="pt-name-right"></small></button>
+        <button type="button" class="pt-tab" data-ptab="vs">対戦<small>戦闘予測</small></button>
+      </div>
       <div id="prep-empty" class="panel hint" hidden>
         バトルにはキャラが必要です。<button type="button" class="link-btn" data-goto="create">キャラ作成</button>からキャラを作って保存してください。
       </div>
       <div id="prep-body" class="prep-layout">
         <div class="prep-side" data-side="left"></div>
         <div class="prep-center">
+          <!-- v1.6.6:スマホ縦向きだけ、画面の下に小さな戦闘予測と ⚙設定・対戦開始 を固定する -->
+          <div class="pt-mini" id="pt-mini" aria-hidden="true"></div>
           <div id="forecast" class="forecast"></div>
-          <button type="button" class="btn btn-main btn-start" id="btn-start" disabled>対戦開始</button>
+          <div class="start-row">
+            <button type="button" class="btn pt-gear" id="btn-pt-gear">⚙<br>設定</button>
+            <button type="button" class="btn btn-main btn-start" id="btn-start" disabled>対戦開始</button>
+          </div>
           <div class="tour-info" id="tour-info" hidden></div>
           <div class="battle-options" id="battle-options">
+            <p class="pt-sheet-title">⚙ 対戦の設定</p>
             <div class="bo-row" role="group" aria-label="何本先取">
               <button type="button" class="bo-btn" data-bestof="1">1本先取</button>
               <button type="button" class="bo-btn" data-bestof="2">2本先取</button>
@@ -131,6 +148,7 @@
               <label class="fx-toggle"><input type="checkbox" id="opt-roulette" checked><span class="fx-switch" aria-hidden="true"></span><span title="スキル抽選・先攻後攻のルーレットの演出">抽選の演出</span></label>
               <label class="fx-toggle" title="好きなスキルを1つ選んで戦う(ONのときはスキル抽選・抽選の演出はなし)"><input type="checkbox" id="opt-skillpick"><span class="fx-switch" aria-hidden="true"></span><span>スキル選択</span></label>
             </div>
+            <button type="button" class="btn pt-sheet-close" id="btn-pt-close">閉じる</button>
           </div>
         </div>
         <div class="prep-side" data-side="right"></div>
@@ -159,9 +177,9 @@
           <h3>キャラ作成</h3>
           <dl class="howto-dl">
             <dt>種族</dt><dd><b>ベオク</b>(人間)は武器を2〜4本持ちます。<b>ラグズ</b>は獣・鳥・竜に化身する種族で、武器は爪などの1つだけです。</dd>
-            <dt>好きな色</dt><dd>色に合う職業が出やすくなります(赤=剣・竜、青=槍、緑=斧・虎、黄=光・軽器・猫、白=弓・飛行・タカ、黒=軽器・重装・カラス、紫=魔法、橙=騎馬)。</dd>
+            <dt>好きな色</dt><dd>色に合う職業が出やすくなります(赤=剣・竜、青=槍、緑=斧・虎、黄=光・軽器・猫、白=弓・飛行・タカ、黒=軽器・重装・カラス、紫=魔法、橙=騎馬、桃=光・飛行・猫、銀=重装・槍・タカ)。</dd>
             <dt>好きな漢字</dt><dd>成長の傾向(力型・速さ型など)が決まります。得意な能力は成長率+15、苦手な能力は-5。</dd>
-            <dt>生年月日</dt><dd>誕生月で属性が決まります(下の「属性」)。誕生日で幸運が少し変わります。</dd>
+            <dt>生年月日</dt><dd>誕生日で幸運が少し変わります。</dd>
             <dt>空欄をランダムで生み出す</dt><dd>入力していない項目だけをランダムに決めて生み出します。全部空欄なら、全部ランダムです。</dd>
           </dl>
           <p>ベオクはLv20、ラグズはLv10まで育った状態で生まれます。レベルアップ演出はスイッチで消せます。</p>
@@ -206,8 +224,10 @@
             <li>キャラを1人選んで、<b>11連戦</b>を勝ち抜くモードです。敵はランダムに生まれたキャラです(キャラ一覧には入りません)。</li>
             <li>自分のキャラは<b>Lv1</b>から始まり、敵を倒すたびにレベルが2つ上がります(ラグズはもともと強いので、Lv1のまま進み、6勝目から2つずつ上がります)。<b>Lv21</b>になるところで上級職にクラスチェンジします。</li>
             <li>敵はLv2から2つずつ強くなり、5体目からスキルを使い、8体目からは上級職です。11体目(<b>EXTRA</b>)は赤竜の<b>イナ</b>(回復・祈り・地の祝福)。</li>
-            <li>スキルは<b>毎回ルーレット</b>か<b>最初に選んで持ち越し</b>。持ち越しでは、最初に2つから1つを選び、勝つたびに「ランダムの2つ」か「倒した敵のスキル」と交換できます(交換しなくてもよい)。10体目を倒したときだけ、交換ではなく<b>2つ目のスキル</b>として追加できます。</li>
+            <li>スキルは最初に2つから1つを選び、勝つたびに「ランダムの2つ」か「倒した敵のスキル」と交換できます(交換しなくてもよい)。<b>9体目</b>を倒すと<b>2つ目のスキル</b>を追加でき、10体目からは1つ目・2つ目の<b>どちらと交換するか</b>を選べます。</li>
+            <li>アーケードでは、先攻・後攻を<b>選ぶ権利</b>をルーレットで決めます。権利をもらったら、先攻か後攻を自分で選べます。</li>
             <li>負けてもコンティニューできます(イナ戦は3回まで)。10体目を倒すとキャラの名前に<span class="arc-mark">★</span>、イナを倒すと<span class="arc-mark arc-full">★★</span>が付きます。途中でやめても、続きから遊べます。</li>
+            <li><b>アイクモード</b>(全20面):アイク(レンジャー Lv1・てつの剣)で戦います。10体目まではふつうと同じ(Lv20まで)。11体目は<b>漆黒の騎士</b>。ラウンド1を耐えればクリアで、ロードにクラスチェンジ。12〜19体目はレベルが3つずつ上がります。18体目はスキルを2つ持つ敵、19体目はなりそこない、20体目は漆黒の騎士との決戦です(10ラウンドまでに倒せないとゲームオーバー)。12体目からは、敵の武器が★★以上になり、ラグズも出てきます。15体目からはアーマー系の敵も出ます。途中で倒した敵の剣やアイテムを手に入れます。剣はラグネルのほかに4つまで持てて、5つ目を手に入れるときは1つ手放します。</li>
           </ul>
         </article>
 
@@ -215,12 +235,12 @@
           <h3>バトルのルール</h3>
           <dl class="howto-dl">
             <dt>ラウンド</dt><dd>1ラウンドで先攻 → 後攻の順に1回ずつ攻撃します。攻速が相手より<b>4以上</b>高いと、もう1回攻撃(追撃)します。どちらかのHPが0になったら決着です。</dd>
-            <dt>先攻・後攻</dt><dd>1ラウンド目はルーレット、2ラウンド目は逆、あとは交互です。シャドウエッジ・スキル『待ち伏せ』を持っていると毎ラウンド先攻。</dd>
+            <dt>先攻・後攻</dt><dd>1ラウンド目はルーレット、2ラウンド目は逆、あとは交互です。スキル『待ち伏せ』(待ち伏せのダガーにも付いています)を持っていると毎ラウンド先攻。</dd>
             <dt>ダメージ</dt><dd>(攻撃力 − 守備)。攻撃力 = 力 + 武器の威力。魔法は魔力で攻撃し、相手は魔防で受けます。特効なら(攻撃力 − 守備)が2倍、必殺ならダメージ3倍。</dd>
             <dt>攻速</dt><dd>速さ − 武器が重すぎる分(重さ − 力。魔導書は重さ − 速さ)。</dd>
             <dt>命中・必殺</dt><dd>命中 = 武器の命中 + 技×2 + 幸運、相手の回避 = 攻速×2 + 幸運。必殺 = 武器の必殺 + 技÷2 − 相手の幸運。</dd>
             <dt>3すくみ</dt><dd>剣 → 斧 → 槍 → 剣、炎 → 風 → 雷 → 炎。有利なら命中+10・威力+1、不利なら逆。</dd>
-            <dt>属性</dt><dd>誕生月で決まります。炎(攻撃+2・命中+10)、水(攻撃+2・防御+2)、風(命中・回避+10)、雷(回避+10・防御+2)、光(命中+10・防御+2)、闇(攻撃+2・回避+10)、天(命中+18)、地(回避+15)。</dd>
+            <dt>属性</dt><dd>入力したすべての項目から、ランダムで決まります(天・地・光・闇は出にくい)。炎(攻撃+2・命中+10)、水(攻撃+2・防御+2)、風(命中・回避+10)、雷(回避+10・防御+2)、光(命中+10・防御+2)、闇(攻撃+2・回避+10)、天(命中+18)、地(回避+15)。</dd>
             <dt>属性の不利</dt><dd>炎は水に、水は雷に、雷は風に、風は炎に弱く、光と闇はお互いに弱い(天・地は弱点なし)。不利な側は属性の補正がなくなります(「不利」の印)。</dd>
             <dt>引き分け</dt><dd>60ラウンドで決着がつかないか、10ラウンド続けてお互いのHPが減らないと引き分けです。</dd>
           </dl>
@@ -231,10 +251,11 @@
           <h3>スキル</h3>
           <ul class="howto-ul">
             <li>対戦のはじめに、ルーレットで1人1つスキルが決まります(OFFにもできます)。多くは<b>技の数値%</b>の確率で発動します。</li>
-            <li>スキルの色:<span class="hs-chip">紫</span>抽選のスキル、<span class="hs-chip ws">緑の枠</span>武器についたスキル、<span class="hs-chip cs">オレンジ</span>兵種スキル(剣士・ソードマスター・アーチャー・スナイパーの必殺+5、魔道士(炎特化・男)の俊足)。</li>
+            <li>スキルの色:<span class="hs-chip">紫</span>抽選のスキル、<span class="hs-chip ws">緑の枠</span>武器についたスキル、<span class="hs-chip cs">オレンジ</span>兵種スキル(剣士・ソードマスター・アーチャー・スナイパーの必殺+5、魔道士(炎特化・男)の俊足、バーサーカーの必殺+10、シーフ・アサシンの盗む)。</li>
             <li>『流星』『天空』などの<b>奥義</b>は、発動すると大きな演出が出ます。『女神の加護』はめったに出ないレアスキルです。</li>
-            <li>『見切り』は相手のスキルを、『能力勝負』はお互いのスキルとバイオリズムを無効にします。</li>
-            <li>『ぶちかまし』(体格×1.5%で、攻撃のあとに体格分のダメージをもう一撃)、『エリート』(ベオクだけ。開幕に上級職になって戦う)、『大器晩成』(4ラウンド目から体格以外の能力値+3)、『地の祝福』(ラウンドのはじめに状態異常と下がった能力を元に戻す)。</li>
+            <li>『見切り』は相手のスキルを、『能力勝負』はお互いのスキル・バイオリズム・属性を無効にします(『能力勝負』と相手の『見切り』は相殺)。</li>
+            <li>『ぶちかまし』(体格×1.5%で、攻撃のあとに体格分のダメージをもう一撃)、『エリート』(ベオクだけ。開幕に上級職になって戦う)、『大器晩成』(5ラウンド目から体格以外の能力値+5)、『地の祝福』(状態異常を受けず、ラウンドのはじめに下がった能力を元に戻す)、『衝撃』(当たると、幸運÷2の確率で相手を麻痺させてスキルを止める)。</li>
+            <li>スキルの効果は、タイトルの<b>データ集</b>でいつでも確かめられます。</li>
             <li>武器スキルと同じスキルは、抽選に出ません。</li>
           </ul>
         </article>
@@ -243,8 +264,8 @@
           <h3>ラグズと化身</h3>
           <ul class="howto-ul">
             <li>ラグズは<b>化身前</b>で始まります。化身前は爪・くちばし・ブレスの威力が0です。</li>
-            <li><b>化身ゲージ</b>が20になると、その場で化身して大きく強くなります。初期値は幸運(タカ+6・カラス+8・猫+2)。</li>
-            <li>化身前はラウンドごとに+4、ダメージを受けるたびに+3。化身中はラウンドの終わりに-5され、0で化身が解けます(また溜まります)。</li>
+            <li><b>化身ゲージ</b>が20になると、その場で化身して大きく強くなります。初期値は幸運(タカ+6・カラス+8・猫+4・虎+2)。</li>
+            <li>化身前はラウンドごとに+4、ダメージを受けるたびに+3、攻撃が当たるたびに+1。化身中はラウンドの終わりに-5され、0で化身が解けます(また溜まります)。</li>
             <li>弓・風魔法は鳥(タカ・カラス)に、ラグズ○○などの武器はラグズに特効です。</li>
           </ul>
         </article>
@@ -252,8 +273,8 @@
         <article class="panel howto-sec" id="ht-weapon">
           <h3>武器と錬成</h3>
           <ul class="howto-ul">
-            <li>★はレア度です。★が多いほど出にくく、強い武器が多くなります。</li>
-            <li><b>錬成</b>:てつ・はがね・細身・どくの武器、手槍・手斧、ファイアー・サンダー・ウインド・ナイフ・ダガーのうち1本が錬成されていることがあります。錬成された武器は名前と数値が<span class="forged">緑</span>になり、「錬成 威+1 命+7」のように中身が出ます。★3以上の武器を持っているキャラには付きません。</li>
+            <li>★はレア度です。★が多いほど出にくく、強い武器が多くなります。すべての武器は、タイトルの<b>データ集</b>で見られます。</li>
+            <li><b>錬成</b>:てつ・はがね・細身・どくの武器、手槍・手斧、ファイアー・サンダー・ウインド・ナイフ・ダガー、エル魔法、スキル付きの武器(★2)のうち1本が錬成されていることがあります。錬成された武器は名前と数値が<span class="forged">緑</span>になり、「錬成 威+1 命+7」のように中身が出ます(威力+0〜5・命中+0〜25・必殺+0〜10・重さ-0〜5)。★3以上の武器を持っているキャラには付きません。</li>
             <li>手斧・手槍などは、ダメージを与えると相手の速さ-1(重なります)。ポイズン・燃焼は毎ラウンドHPが減ります。</li>
             <li>武器の説明は、武器の下に短く書いてあります。マウスを乗せると、もっと詳しい説明が出るものもあります。</li>
           </ul>
@@ -264,10 +285,27 @@
           <ul class="howto-ul">
             <li>バトル中は「速度:はやい」で2倍速、「結果まで飛ばす」ですぐに結果が見られます。</li>
             <li>「スキルそのままでもう一度」で、同じスキルのまま何度も試せます。</li>
-            <li>スマホでは、バトル準備・バトルは横向きで遊んでください。</li>
+            <li>スマホは縦向きでも横向きでも遊べます。縦向きのバトル準備は、上のタブで「1P・2P・対戦」を切りかえます。何本先取などは「⚙設定」にあります。</li>
+            <li>縦向きのバトルでは、スキルの札をタップすると説明が出ます。</li>
           </ul>
           <div class="card-actions"><button type="button" class="btn btn-main" data-goto="create">キャラを作る</button><button type="button" class="btn" data-goto="prep">バトルへ</button></div>
         </article>
+      </div>
+    </section>
+
+    <!-- v1.6.4:データ集(武器・スキル・職業・属性を見る。中身は data/*.json から作る) -->
+    <section id="screen-data" class="screen">
+      <h2 class="screen-title">データ集</h2>
+      <div class="howto data-book">
+        <nav class="howto-toc panel data-tabs" aria-label="データの種類">
+          <button type="button" class="data-tab" data-tab="weapon">武器</button>
+          <button type="button" class="data-tab" data-tab="skill">スキル</button>
+          <button type="button" class="data-tab" data-tab="class">職業</button>
+          <button type="button" class="data-tab" data-tab="laguz">ラグズ</button>
+          <button type="button" class="data-tab" data-tab="element">属性</button>
+        </nav>
+        <div class="panel data-filter" id="data-filter"></div>
+        <div class="panel howto-sec data-body" id="data-body"></div>
       </div>
     </section>
 
@@ -313,26 +351,21 @@
       </div>
     </section>
 
-    <!-- v1.6.0:アーケードの準備(キャラとスキルの決め方) -->
+    <!-- v1.6.0:アーケードの準備。v1.6.1:スキルは持ち越しだけ(モードの選択に)・選んだキャラの能力値と武器 -->
     <section id="screen-asetup" class="screen">
       <h2 class="screen-title">アーケードの準備</h2>
-      <div class="tsetup">
+      <div class="tsetup asetup" id="asetup">
         <div class="panel tsetup-rules">
-          <div class="ts-row"><span class="ts-k">スキル</span><div class="ts-v bo-row" id="as-skill">
-            <button type="button" class="bo-btn" data-v="random" title="試合ごとにスキルのルーレット">毎回ルーレット</button><button type="button" class="bo-btn" data-v="carry" title="最初に2つから1つ選び、勝つと交換できる">最初に選んで持ち越し</button></div></div>
-          <p class="ts-note" id="as-skill-note"></p>
-          <ul class="ts-note as-rules">
-            <li>11連戦を勝ち抜く。敵はランダムに生まれたキャラ</li>
-            <li>自分はLv1から。1勝でLv+2、Lv21でクラスチェンジ(ラグズはLv1のまま進み、6勝目から+2)</li>
-            <li>敵はLv2から2つずつ上がる。5体目からスキル、8体目から上級職</li>
-            <li>11体目(EXTRA)は赤竜のイナ。10体目を倒すと★、イナを倒すと★★</li>
-            <li>負けてもコンティニューできる(イナ戦は3回まで)</li>
-          </ul>
+          <div class="ts-row"><span class="ts-k">モード</span><div class="ts-v bo-row" id="as-mode">
+            <button type="button" class="bo-btn" data-v="normal" title="自分のキャラで11連戦">ふつう</button><button type="button" class="bo-btn" data-v="ike" title="アイクで全20面">アイクモード</button></div></div>
+          <p class="ts-note" id="as-mode-note"></p>
+          <ul class="ts-note as-rules" id="as-rules"></ul>
         </div>
-        <div class="panel tsetup-pick">
+        <div class="panel tsetup-pick" id="as-pick">
           <div class="ts-pick-head"><span id="as-picked" class="ts-picked"></span></div>
           <ul class="ts-chars" id="as-chars"></ul>
         </div>
+        <div class="panel as-detail" id="as-detail"></div>
         <div class="ts-start">
           <button type="button" class="btn btn-main" id="as-start" disabled>アーケード開始</button>
           <p class="muted" id="as-start-note"></p>
@@ -398,14 +431,6 @@
 
   </main>
 
-  <!-- v1.3.5:スマホを縦にしてバトル準備・バトルを開いたときの案内(横画面専用) -->
-  <div class="rotate-hint" aria-live="polite">
-    <div class="rotate-box">
-      <div class="rotate-icon" aria-hidden="true"><span></span></div>
-      <p>スマホを<b>横向き</b>にしてください</p>
-      <small>バトル準備・バトルは横画面専用です</small>
-    </div>
-  </div>
 
   <!-- v1.4.0:タイトルの動く背景と暗転 -->
   <div class="title-bg" aria-hidden="true"><div class="tb-glow"></div><div class="tb-glow tb-glow2"></div><div class="tb-sparks" id="title-sparks"></div></div>
@@ -461,7 +486,25 @@
         <div class="roulette-slot" data-side="left"><span class="r-name"></span><span class="r-skill">―</span></div>
         <div class="roulette-slot" data-side="right"><span class="r-name"></span><span class="r-skill">―</span></div>
       </div>
+      <!-- v1.6.1:アーケードは、先攻・後攻を選ぶ権利をルーレットで決める -->
+      <p class="roulette-choice-text" id="roulette-choice-text" hidden></p>
+      <div class="roulette-choice" id="roulette-choice" hidden>
+        <button type="button" class="btn btn-main" data-first="me">先攻にする</button>
+        <button type="button" class="btn btn-main" data-first="foe">後攻にする</button>
+      </div>
     </div>
+  </div>
+
+  <!-- v1.6.1:会話・暗転・STAGE CLEAR・GAME OVER(アーケード) -->
+  <div id="talk" class="overlay talk" hidden>
+    <div class="talk-dark" id="talk-dark"></div>
+    <div class="talk-banner" id="talk-banner" hidden></div>
+    <div class="talk-box" id="talk-box" hidden>
+      <span class="talk-name" id="talk-name"></span>
+      <p class="talk-text" id="talk-text"></p>
+      <i class="talk-next" aria-hidden="true">▼</i>
+    </div>
+    <button type="button" class="btn btn-small talk-skip" id="talk-skip" hidden>会話をスキップ ▶▶</button>
   </div>
 
   <script src="js/gamedata.js"></script>
