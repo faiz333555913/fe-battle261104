@@ -50,8 +50,11 @@
   }
 
   // 属性アイコン + 上がる数値。v1.5.0:weakVs(相手の属性)に不利なら、補正に線を引いて「不利」と出す
+  // v1.7.2:weakVs は配列でもよい(相手が属性を2つ持つとき)
   function elementChip(element, weakVs) {
-    const weak = !!(weakVs && (global.Config.elementWeakTo[element] || []).includes(weakVs));
+    const vs = [].concat(weakVs || []).filter(Boolean);
+    weakVs = vs.find((x) => (global.Config.elementWeakTo[element] || []).includes(x)) || null;
+    const weak = !!weakVs;
     return `<span class="element-chip${weak ? " elem-weak" : ""}"${weak ? ` title="属性不利(${esc(weakVs)}に弱い):属性の補正が無効"` : ""}>${elementBadge(element)}<span class="element-bonus">${esc(elementText(element))}</span>${weak ? '<span class="elem-weak-tag">不利</span>' : ""}</span>`;
   }
 
@@ -88,7 +91,8 @@
   function fighterHeader(char, opts = {}) {
     const cls = DB.classByName[char.className];
     const tribe = cls && cls.tribe ? `<span class="badge tribe" title="部族">${esc(cls.tribe)}</span>` : "";
-    const elem = opts.element ? elementChip(char.element, opts.foeElement) : "";
+    // v1.7.2:受け継いだ2つ目の属性(3on3)も並べる
+    const elem = opts.element ? elementChip(char.element, opts.foeElement) + (char.element2 ? `<span class="elem-plus" title="受け継いだ属性">+</span>${elementChip(char.element2, opts.foeElement)}` : "") : "";
     return `<div class="char-head fighter-head"><div class="icon-col">${charIcon(char, opts.big ? "big" : "", { noWeapon: opts.noIconWeapon })}${raceChip(char)}</div><div class="char-title">
       <div class="char-name">${esc(char.name)}${genderMark(char)}${opts.nameExtra || ""}</div>
       <div class="char-class">${esc(char.className)}${char.arcadeLv ? `<small class="lv1">Lv${char.arcadeLv}</small>` : ""}</div>
@@ -280,6 +284,17 @@
   }
 
   // バイオリズムの波(好調=山、普通=中央、不調=谷に印)
+  // v1.7.2:バイオリズムを矢印1文字で(3on3の選ぶ画面)。好調⤴・普通→・不調⤵
+  const BIO_ARROW = { 好調: ["⤴", "bio-good"], 普通: ["→", "bio-normal"], 不調: ["⤵", "bio-bad"] };
+  function bioArrow(bio) {
+    if (!bio) return "";
+    const [a, cls] = BIO_ARROW[bio.name] || ["→", "bio-normal"];
+    return `<span class="bio-arrow ${cls}" title="バイオリズム:${esc(bio.name)}(${esc(bioText(bio))})" aria-label="バイオリズム ${esc(bio.name)}">${a}</span>`;
+  }
+  // v1.7.2:属性のバッジ。受け継いだ2つ目の属性があれば「+」でつなぐ
+  function elementBadges(char) {
+    return elementBadge(char.element) + (char.element2 ? `<span class="elem-plus" title="受け継いだ属性">+</span>${elementBadge(char.element2)}` : "");
+  }
   function bioText(bio) {
     if (bio.name === "普通") return "補正なし";
     const parts = [`命中・回避${bio.hit > 0 ? "+" : ""}${bio.hit}`];
@@ -327,6 +342,6 @@
     charWeapon, markBadge, classSkillChip, growthBonus,
     arcadeMark, esc, charIcon, weaponTypeLabel, formStats, weaponEffect, moveBadge, moveTypeOf, raceChip, fighterHeader, bonusText, bonusRow, elementBadge, elementText, elementChip, tagBadges, badges, genderMark,
     statGrid, statTable, triMark, weaponLine, weaponCard, weaponCards, charHeader, charCard,
-    bioWave, bioText, skillInfo, skillChip,
+    bioWave, bioText, bioArrow, elementBadges, skillInfo, skillChip,
   };
 })(window);

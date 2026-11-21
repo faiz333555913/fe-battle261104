@@ -129,6 +129,22 @@ button, input, select { font: inherit; color: inherit; }
   color: transparent;
   text-shadow: 0 4px 24px rgba(216, 183, 90, .25);
 }
+/* v1.7.0:ロゴが淡く光る。ゆっくり明るくなったり暗くなったりする光(logo-glow)と、ときどき左から右へ流れる光の筋(logo-shine) */
+.title-heading {
+  background-image: linear-gradient(100deg, rgba(255, 255, 255, 0) 42%, rgba(255, 252, 236, .9) 50%, rgba(255, 255, 255, 0) 58%), linear-gradient(180deg, #fff6d6, var(--gold) 60%, #8a6a22);
+  background-size: 300% 100%, 100% 100%;
+  background-repeat: no-repeat;
+  background-position: 100% 0, 0 0;
+  animation: logo-glow 4.8s ease-in-out infinite, logo-shine 7.5s ease-in-out 1.2s infinite;
+}
+@keyframes logo-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(255, 228, 160, .18)); }
+  50% { filter: drop-shadow(0 0 10px rgba(255, 228, 160, .55)) drop-shadow(0 0 26px rgba(216, 183, 90, .32)); }
+}
+@keyframes logo-shine { 0%, 62% { background-position: 100% 0, 0 0; } 92%, 100% { background-position: 0% 0, 0 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .title-heading { animation: none; filter: drop-shadow(0 0 8px rgba(255, 228, 160, .4)); }
+}
 .title-menu { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .title-menu .btn { width: 240px; font-size: 1.05rem; }
 
@@ -1072,7 +1088,7 @@ button, .btn, .choice, .link-btn { touch-action: manipulation; -webkit-tap-highl
   .prep-side .stat-element .element-chip { font-size: 8px; }
   .prep-side .stat-element .element-chip .badge { width: 14px; height: 14px; }
   .weapon-head { margin: 2px 0 0; font-size: 11px; }
-  .weapon-head .wtype { width: 16px; height: 16px; font-size: 9px; margin-left: 4px; }
+  .weapon-head .wtype { width: 16px; height: 16px; font-size: 9px; margin-left: 4px; min-width: 0; padding: 0; } /* v1.6.7:文字を円のまん中に */
   .weapon-list { display: flex; flex-direction: column; gap: 2px; min-height: 0; }
   .weapon-choice { min-height: 0; padding: 3px 7px; gap: 0 6px; border-radius: 5px; grid-template-columns: 1fr auto; }
   .weapon-choice .w-name { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1185,6 +1201,7 @@ button, .btn, .choice, .link-btn { touch-action: manipulation; -webkit-tap-highl
   .head-bio .bio-label small { display: none; }
   .head-bio .bio svg { width: 34px; }
   #screen-battle .fighter-head .element-bonus, #screen-prep .fighter-head .element-bonus { display: none; }
+  #screen-battle .fighter-head .element-chip, #screen-prep .fighter-head .element-chip { padding-right: 0; } /* v1.6.7:補正を隠したとき、属性の文字が枠の左に寄っていたのを直す */
   #screen-battle .fighter-head .badges .badge.tribe { display: none; }
   .fc-k { font-size: 9px; }
   .fc-plan .fc-k { font-size: 8px; }
@@ -1724,7 +1741,7 @@ table.stats thead th { white-space: nowrap; }
 .tb-p.win { color: var(--gold); font-weight: bold; }
 .tb-p.lose { color: var(--muted); }
 .tb-p.bye { color: var(--muted); font-style: italic; }
-.tb-p em { font-style: normal; font-size: .72rem; background: rgba(216, 183, 90, .18); border-radius: 3px; padding: 0 4px; white-space: nowrap; }
+.tb-p em { font-style: normal; font-size: .72rem; background: rgba(216, 183, 90, .18); border-radius: 3px; padding: 0 4px; white-space: nowrap; line-height: 1.6; align-self: center; } /* v1.6.7:「勝」を枠のまん中に */
 .tour-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 .tour-table th { text-align: left; color: var(--gold); font-weight: normal; font-size: .78rem; border-bottom: 1px solid var(--line); padding: 4px 6px; }
 .tour-table td { padding: 5px 6px; border-bottom: 1px solid rgba(255, 255, 255, .06); }
@@ -2032,7 +2049,7 @@ table.stats thead th { white-space: nowrap; }
 }
 
 /* ---- v1.6.4:データ集 ---- */
-.data-book { max-width: 1100px; }
+.data-book { max-width: 1100px; grid-template-columns: minmax(0, 1fr); } /* v1.6.7:スマホで表が画面からはみ出していたのを直す(表は枠の中で横スクロール) */
 .data-tabs { gap: 8px; }
 .data-tab, .data-chip { font: inherit; cursor: pointer; color: var(--fg); background: #141b33; border: 1px solid var(--line); border-radius: 999px; padding: 4px 16px; }
 .data-tab:hover, .data-chip:hover { border-color: var(--gold); }
@@ -2070,3 +2087,241 @@ table.stats thead th { white-space: nowrap; }
 /* 『盗む』のカットイン:盗んだ物の名前 */
 .fx-skill em { display: block; font-style: normal; font-size: .85rem; letter-spacing: .15em; color: #fff3c4; }
 @media (max-height: 500px) { .fx-skill em { font-size: .65rem; } }
+
+/* =========================================================
+   v1.6.7 で追加した部分
+   ========================================================= */
+/* トーナメントの順位表:スキル名を折り返さず、そろえて表示する */
+.tour-table td.rec { white-space: nowrap; }
+.tour-table td.sk { white-space: nowrap; }
+.tour-table td.sk .skill-chip { white-space: nowrap; display: inline-block; }
+@media (max-width: 600px) {
+  .tour-table { font-size: .8rem; table-layout: auto; }
+  .tour-table th, .tour-table td { padding: 6px 3px; vertical-align: middle; }
+  .tour-table th:first-child, .tour-table td:first-child { padding-left: 6px; }
+  .tour-table td.rk small { display: block; margin: 0; font-size: .62rem; }
+  .tour-table td.nm { white-space: nowrap; }
+  .tour-table td.nm .gender { margin-left: 2px; }
+  .tour-table td.cl { font-size: .74rem; line-height: 1.3; }
+  .tour-table th:last-child, .tour-table td.sk { text-align: center; padding-right: 6px; }
+  .tour-table td.sk .skill-chip { font-size: .72rem; padding: 2px 8px; line-height: 1.4; min-width: 4.6em; text-align: center; }
+}
+
+/* =================== v1.7.0 3on3 =================== */
+/* 準備:左にルール、まん中にキャラ一覧、右に自分のチーム(武器を選ぶ) */
+.tsetup.ttsetup { grid-template-columns: 300px minmax(0, 1fr) minmax(280px, 360px); }
+.ttsetup .ts-chars li .ts-no { position: static; margin-left: auto; flex: none; }
+.tt-team { display: flex; flex-direction: column; gap: 8px; }
+.tt-team .side-label { margin: 0; color: var(--gold); font-weight: bold; }
+.tt-team .side-label small { margin-left: 8px; color: var(--muted); font-weight: normal; font-size: .75rem; }
+.tt-slot { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: #141b33; border: 1px solid var(--line); border-radius: 8px; min-height: 58px; }
+.tt-slot.empty { border-style: dashed; }
+.tt-slot .ts-no { position: static; flex: none; }
+.tt-slot-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.tt-slot-body .li-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-slot-body .li-name small { margin-left: 6px; color: var(--muted); font-size: .75rem; }
+.tt-weapon { width: 100%; min-width: 0; background: #0f1528; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font-size: .82rem; }
+@media (min-width: 761px) and (max-width: 1100px) {
+  .tsetup.ttsetup { grid-template-columns: 300px minmax(0, 1fr); }
+  .tsetup.ttsetup .tt-team { grid-column: 2; }
+}
+@media (max-width: 760px) { .tsetup.ttsetup { grid-template-columns: 1fr; } }
+@media (max-height: 500px) and (orientation: landscape) {
+  .tsetup.ttsetup { grid-template-columns: 220px minmax(0, 1fr) minmax(220px, 280px); }
+  .ttsetup .ts-chars { grid-template-columns: 1fr; max-height: 62vh; }
+  .tt-slot { padding: 4px 8px; min-height: 0; gap: 6px; }
+  .tsetup.ttsetup .tt-team { grid-column: auto; }
+  .tt-reveal { max-height: 42vh; overflow-y: auto; margin-bottom: 6px; }
+  .tt-rv li { padding: 3px 6px; }
+  .tt-rv li > div { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+}
+
+/* バトル:上の帯(チームの3人)。相手のまだ出ていないキャラは「？」 */
+.tt-strip { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 10px; }
+.tt-strip[hidden] { display: none; }
+.tt-side { display: flex; align-items: center; gap: 8px; }
+.tt-side small { color: var(--gold); font-weight: bold; letter-spacing: .1em; }
+.tt-mini { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; opacity: .75; transition: opacity .3s, transform .3s; }
+.tt-mini.on { opacity: 1; transform: translateY(-2px); }
+.tt-mini.on .char-icon { box-shadow: 0 0 0 2px var(--gold), 0 0 12px rgba(216, 183, 90, .6); }
+.tt-mini.dead { opacity: 1; }
+.tt-mini.dead .char-icon, .tt-mini.dead .tt-mhp { opacity: .35; filter: grayscale(1); }
+.tt-mini.dead::after { content: "✕"; position: absolute; top: 4px; left: 0; right: 0; text-align: center; color: #ff6b6b; font-weight: 900; font-size: 1.5rem; text-shadow: 0 2px 3px #000; }
+.tt-mhp { width: 40px; height: 4px; border-radius: 2px; background: #2a1820; overflow: hidden; }
+.tt-mhp i { display: block; height: 100%; background: var(--green); }
+.char-icon.tt-q { --c: #2a3354; background: #2a3354; color: var(--muted); border: 1px dashed var(--line); }
+/* 最初に出てくるまでのキャラ枠 */
+.fighter.tt-empty { display: grid; place-items: center; }
+.tt-wait { margin: 0; font-size: 4rem; color: rgba(154, 163, 192, .35); font-weight: 900; }
+.fighter.tt-down { filter: grayscale(.85) brightness(.7); }
+.skill-chip.tt-hidden { color: var(--muted); border-style: dashed; letter-spacing: .15em; }
+
+/* 出すキャラを選ぶ(ラウンドの前)・スキル抽選 */
+.tt-pick { padding: 16px; overflow-y: auto; }
+.tt-box { width: min(760px, 100%); text-align: center; }
+.tt-title { color: var(--gold); letter-spacing: .25em; font-size: 1.2rem; margin: 0 0 4px; font-weight: bold; }
+.tt-sub { color: var(--muted); font-size: .82rem; margin: 0 0 12px; }
+.tt-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tt-vs { margin: 10px 0; color: var(--gold); font-weight: bold; letter-spacing: .2em; }
+.tt-card { position: relative; display: flex; align-items: flex-start; gap: 8px; padding: 10px; text-align: left; font: inherit; color: var(--fg);
+  background: linear-gradient(180deg, #1d2748, #141b33); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+button.tt-card { cursor: pointer; transition: border-color .2s, transform .15s, box-shadow .2s; }
+button.tt-card:hover:not(:disabled), button.tt-card:focus-visible { border-color: var(--gold); box-shadow: 0 0 14px rgba(216, 183, 90, .35); transform: translateY(-2px); outline: none; }
+.tt-card.last { border-color: var(--gold-soft); }
+.tt-card.dead { opacity: .45; filter: grayscale(1); cursor: default; }
+.tt-card.unknown { justify-content: flex-start; align-items: center; border-style: dashed; }
+.tt-row.foe .tt-card { background: linear-gradient(180deg, #2a1d2e, #1a1424); border-color: #6a3a52; }
+.tt-c-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.tt-c-body b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-c-body small { color: var(--muted); font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-hp { display: flex; align-items: center; gap: 6px; }
+.tt-hpbar { flex: 1; height: 6px; border-radius: 3px; background: #2a1820; overflow: hidden; }
+.tt-hpbar i { display: block; height: 100%; background: var(--green); }
+.tt-hp em { font-style: normal; font-size: .75rem; color: #cfd6f0; white-space: nowrap; }
+.tt-c-skill { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.tt-c-skill .skill-chip.spinning { color: #fff; border-color: var(--gold); }
+.tt-gauge, .tt-st { font-size: .68rem; padding: 1px 6px; border-radius: 8px; background: #2b3560; color: #cfd6f0; white-space: nowrap; }
+.tt-gauge.on { background: #6a4a10; color: #ffe08a; }
+.tt-st { background: #4a2860; }
+.tt-ko { position: absolute; top: 6px; right: 6px; font-size: .7rem; font-weight: bold; color: #ff8b8f; border: 1px solid #ff8b8f; border-radius: 4px; padding: 0 4px; }
+.tt-pick-btns { margin-top: 12px; }
+.tt-pick-btns .btn[hidden] { display: none; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .tt-pick { padding: 8px; }
+  .tt-title { font-size: 1rem; }
+  .tt-sub { margin-bottom: 6px; font-size: .74rem; }
+  .tt-vs { margin: 4px 0; font-size: .8rem; }
+  .tt-card { padding: 6px 8px; }
+  .tt-pick-btns { margin-top: 6px; }
+  .tt-strip { margin-bottom: 4px; }
+  .tt-strip .char-icon.small { width: 28px; height: 28px; font-size: .9rem; }
+  .tt-mhp { width: 28px; }
+}
+
+/* 決着:相手のチームを全部見せる */
+.tt-reveal { text-align: left; margin: 0 0 10px; }
+.tt-rv-title { margin: 0 0 6px; color: var(--gold); font-size: .85rem; font-weight: bold; }
+.tt-rv { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tt-rv li { position: relative; display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #141b33; border: 1px solid var(--line); border-radius: 8px; }
+.tt-rv li > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tt-rv small { color: var(--muted); font-size: .72rem; }
+.tt-rv-skill { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .74rem; }
+.tt-pick.drawing button.tt-card { pointer-events: none; }
+
+/* ===== v1.7.1:3on3(王・休み・属性と職業・戦闘予測・決定ボタン) ===== */
+.tt-c-body small .badge.element { width: 16px; height: 16px; min-width: 16px; font-size: .62rem; margin-right: 4px; vertical-align: -3px; }
+.tt-unseen { font-size: .68rem; color: var(--muted); }
+.tt-king, .tt-crown { display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #ffe08a, #c99a2e); color: #3a2600; font-weight: 900; border-radius: 4px; }
+.tt-king { font-size: .66rem; padding: 1px 4px; margin-right: 5px; vertical-align: 1px; }
+.tt-crown { position: absolute; top: -6px; right: -6px; font-size: .58rem; width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+.tt-rest { position: absolute; top: 6px; right: 6px; font-size: .68rem; font-weight: bold; color: #9aa3c0; border: 1px solid #56608a; border-radius: 4px; padding: 0 4px; background: #121830; }
+.tt-card.rest { opacity: .6; }
+button.tt-card.rest:disabled { cursor: not-allowed; }
+.tt-card.sel { border-color: var(--gold) !important; box-shadow: 0 0 0 2px var(--gold), 0 0 16px rgba(216, 183, 90, .45); }
+.tt-row.foe .tt-card.sel { border-color: #ff8fb0 !important; box-shadow: 0 0 0 2px #ff8fb0, 0 0 16px rgba(255, 143, 176, .4); }
+.tt-fc { margin-top: 10px; padding: 8px 10px; background: #10162c; border: 1px solid var(--line); border-radius: 10px; min-height: 40px; }
+.tt-fc[hidden] { display: none; }
+.tt-fc-empty { margin: 4px 0; color: var(--muted); font-size: .8rem; }
+.tt-fc-title { margin: 0 0 6px; color: var(--gold); font-size: .78rem; font-weight: bold; letter-spacing: .15em; }
+.tt-fc-body { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
+.tt-fc-vs { color: var(--gold); font-size: .8rem; }
+.tt-fc-side { min-width: 0; }
+.tt-fc-name { margin: 0 0 4px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: .82rem; }
+.tt-fc-name b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-fc-name small { color: #cfd6f0; font-size: .72rem; white-space: nowrap; }
+.tt-pick-btns { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+#tt-decide { min-width: 180px; }
+#tt-decide:disabled { opacity: .5; }
+.tt-arc-team { display: grid; gap: 8px; }
+.tt-arc-member { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: #141b33; border: 1px solid var(--line); border-radius: 8px; }
+.tt-arc-member .tt-slot-body { flex: 1; }
+.arc-who { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 760px) { .arc-who { grid-template-columns: 1fr; } }
+.arc-team-me { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 900px) { .arc-team-me { grid-template-columns: 1fr; } }
+.arc-team-me > div { min-width: 0; padding: 8px; background: #141b33; border: 1px solid var(--line); border-radius: 8px; }
+.tn-vs.team { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; }
+.tn-team { display: grid; gap: 6px; min-width: 0; }
+.tn-team .tn-fighter { padding: 6px 8px; }
+.tt-arc-weapon { margin-top: 4px; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .tt-fc { margin-top: 6px; padding: 4px 8px; }
+  .tt-fc-title { display: none; }
+  .tt-fc .mini-fc span { padding: 2px; }
+}
+/* v1.7.1:アーケードのモードが3つ(ふつう・アイクモード・3on3)になったので、3on3 は2段目に横いっぱい */
+.ts-v.bo-row#as-mode { flex-wrap: wrap; }
+#as-mode .bo-btn { padding-left: 6px; padding-right: 6px; }
+#as-mode .bo-btn[data-v="team"] { flex: 1 1 100%; }
+.tsetup.asetup.team .ts-chars li .ts-no { position: static; margin-left: auto; flex: none; }
+.tt-arc-member .fighter-header, .tt-arc-member > div { min-width: 0; }
+@media (max-width: 760px) {
+  .tn-vs.team { grid-template-columns: minmax(0, 1fr); text-align: left; }
+  .tn-vs.team .tn-v { text-align: center; }
+  .tn-team .tn-fighter { flex-direction: row; text-align: left; }
+}
+/* v1.7.2:3on3 バイオリズムの矢印・自分の補正・受け継いだ2つ目の属性 */
+.bio-arrow { display: inline-flex; align-items: center; justify-content: center; margin-left: 6px; min-width: 18px; height: 18px; padding: 0 2px; border-radius: 5px; font-size: .8rem; font-weight: 900; line-height: 1; background: rgba(15, 21, 40, .7); border: 1px solid var(--line); vertical-align: 1px; }
+.bio-arrow.bio-good { color: var(--green); border-color: rgba(80, 200, 120, .5); }
+.bio-arrow.bio-bad { color: var(--red); border-color: rgba(255, 107, 107, .5); }
+.bio-arrow.bio-normal { color: #c7cde4; }
+.tt-mini .bio-arrow { position: absolute; top: -6px; left: -6px; margin: 0; min-width: 16px; height: 16px; font-size: .7rem; box-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+.tt-bonus { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; font-size: .7rem; color: var(--muted); }
+.tt-bonus em { font-style: normal; color: var(--gold-soft); font-weight: bold; margin-right: 1px; }
+.tt-bonus b { margin-left: 2px; font-variant-numeric: tabular-nums; }
+.tt-bonus .up b { color: var(--green); }
+.tt-bonus .down b { color: var(--red); }
+.elem-plus { display: inline-block; margin: 0 3px 0 -1px; color: var(--gold); font-weight: 900; font-size: .75rem; vertical-align: 1px; }
+.tt-c-body small .elem-plus { margin: 0 3px 0 -3px; }
+.badges .elem-plus { margin: 0 2px; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .tt-bonus { font-size: .62rem; gap: 1px 4px; }
+  .bio-arrow { min-width: 15px; height: 15px; font-size: .68rem; margin-left: 4px; }
+}
+
+/* ================= v1.7.3:3on3(先攻後攻・回復の演出・連続・4on4・武器の変更・結果まで飛ばす・2P対戦) ================= */
+.tt-order { margin: -4px 0 10px; font-size: .86rem; color: #cfd6f0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; }
+.tt-order[hidden] { display: none; }
+.tt-order b { color: var(--fg); }
+.tt-order small { flex-basis: 100%; color: var(--muted); font-size: .72rem; }
+.tt-order-tag { font-weight: 900; font-size: .78rem; letter-spacing: .1em; padding: 2px 10px; border-radius: 10px; }
+.tt-order-tag.first { background: linear-gradient(180deg, #ffe08a, #c99a2e); color: #3a2600; }
+.tt-order-tag.second { background: #2b3560; color: #cfd6f0; border: 1px solid #56608a; }
+.tt-rest.tt-chain { color: #ffd27a; border-color: #8a6a2a; background: #2a2210; }
+.tt-row.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.tt-row.n4 .tt-card { padding: 8px 6px; gap: 6px; }
+.tt-row.n4 .tt-rest { top: 3px; right: 3px; font-size: .6rem; padding: 0 3px; }
+.tt-row.n4 .tt-c-body > b:first-child { padding-right: 14px; }
+.tt-row[data-label]:not([data-label=""])::before { content: attr(data-label); grid-column: 1 / -1; text-align: left; color: var(--gold); font-size: .74rem; font-weight: bold; letter-spacing: .1em; margin-bottom: -4px; }
+/* 回復の演出(選ぶ画面を開いたとき) */
+.tt-hpbar i { transition: width 1.1s ease-out .25s; }
+.tt-card.tt-healed { animation: tt-heal-glow 2.2s ease-out 1; }
+@keyframes tt-heal-glow { 0% { box-shadow: inset 0 0 0 rgba(120, 230, 150, 0), 0 0 0 0 rgba(120, 230, 150, 0); } 25%, 55% { box-shadow: inset 0 0 34px rgba(120, 230, 150, .5), 0 0 0 3px rgba(120, 230, 150, .9), 0 0 24px rgba(120, 230, 150, .6); } 100% { box-shadow: inset 0 0 0 rgba(120, 230, 150, 0), 0 0 0 0 rgba(120, 230, 150, 0); } }
+.tt-heal-pop { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); pointer-events: none; color: #8dffb0; font-weight: 900; font-size: 1.7rem; line-height: 1; z-index: 2; text-align: center;
+  text-shadow: 0 0 8px rgba(60, 200, 110, .95), 0 2px 3px #000; white-space: nowrap; opacity: 0; animation: tt-heal-pop 2.6s ease-out .1s 1 forwards; }
+.tt-heal-pop small { display: block; font-size: .7rem; margin-bottom: 2px; color: #e2ffe9; font-weight: bold; letter-spacing: .1em; }
+@keyframes tt-heal-pop { 0% { opacity: 0; transform: translate(-50%, 12px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.2); } 30%, 75% { opacity: 1; transform: translate(-50%, -4px) scale(1); } 100% { opacity: 0; transform: translate(-50%, -18px); } }
+/* 武器の変更 */
+.tt-wc-box { margin-top: 8px; }
+.tt-wc-box[hidden], .tt-wc-box:empty { display: none; }
+.tt-wc { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: .8rem; color: var(--gold-soft); }
+.tt-wc .tt-weapon { width: auto; max-width: 100%; flex: 0 1 340px; }
+.tt-wc-note { margin: 0; font-size: .74rem; }
+/* 設定の行(2Pのチームを選んでいる間は変えられない) */
+.ttsetup .bo-btn:disabled { opacity: .5; cursor: not-allowed; }
+.tt-who { font-style: normal; font-weight: 900; color: #3a2600; background: linear-gradient(180deg, #ffe08a, #c99a2e); border-radius: 4px; padding: 0 6px; margin-right: 6px; }
+.ttsetup.p2 .tt-who { background: linear-gradient(180deg, #ffb3c8, #c95a7e); color: #2a0010; }
+/* 2P対戦の交代の幕(うしろは見えない) */
+.overlay.tt-cover { z-index: 140; background: #070a14; backdrop-filter: none; }
+.tt-cover-box { text-align: center; padding: 24px; }
+.tt-cover-title { margin: 0 0 10px; font-size: 2.4rem; font-weight: 900; letter-spacing: .2em; color: var(--gold); text-shadow: 0 0 18px rgba(216, 183, 90, .5); }
+.tt-cover-sub { margin: 0 0 22px; color: #cfd6f0; font-size: .95rem; }
+#tt-cover-btn { min-width: 220px; font-size: 1.1rem; padding: 12px 24px; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .tt-order { margin: -2px 0 4px; font-size: .74rem; }
+  .tt-wc-box { margin-top: 4px; }
+  .tt-cover-title { font-size: 1.8rem; }
+}
+/* v1.7.3:相手の3つ目(2P対戦)は下の段に */
+.ts-v.bo-row#tt-foe { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ts-v.bo-row#tt-foe .bo-btn[data-v="2p"] { grid-column: 1 / -1; }

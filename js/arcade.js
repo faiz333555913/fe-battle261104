@@ -96,6 +96,8 @@
   const IKE_DEF_CAP_EARLY = { from: 3, to: 6, def: 10 };
   // v1.6.5:アイクモードのランダムの敵には出ないスキル(ガトー指示)
   const IKE_NO_ENEMY_SKILLS = ["天空", "勇将", "瞬殺", "援軍"];
+  // v1.6.7:アーケードのランダムの敵に出さないスキル(ふつう・アイクモードとも)
+  const NO_ENEMY_SKILLS = ["女神の加護"];
   // 18体目のイナ:半化身の指輪(化身ゲージ20でスタート)・能力値を下げる
   const IKE_INA_DELTA = { str: -5, skl: -2, spd: -1, def: -2, res: -2 };
   const ROBE_STAGE = 1, ROBE_HP = 7;
@@ -117,6 +119,8 @@
   const GURGURANT = "sword:グルグラント";
   // v1.6.2:アイクモードのランダムの敵に出さない職業(上級職の名前も見る)と、装備しない武器
   const IKE_NO_CLASSES = ["レンジャー", "ロード", "ワルキューレ"];
+  // v1.7.2:ふつうのアーケード(3on3も)のランダムの敵に出さない職業(ガトー指定。下級職の名前も上級職の名前も見る)
+  const NORMAL_NO_CLASSES = ["レンジャー", "クレリック", "ワルキューレ"];
   // v1.6.3:アシュナード戦の前に選べる3つ目のスキル(ガトー指定)
   // v1.6.4(ガトー指定):大盾・疾風の刃・咆哮・勇将・キャンセル・大器晩成・流星
   // v1.6.5(ガトー指定):流星 → 空の祝福
@@ -203,7 +207,8 @@
   const usable = (char, className, name) => skillPoolFor(char, className).some((s) => s.name === name);
   // 重みつきで n 個(同じものは選ばない。exclude のスキルも選ばない)
   function drawSkills(pool, n, exclude, rng) {
-    let rest = pool.filter((s) => !exclude.includes(s.name));
+    const no = global.Config.noRouletteSkills || []; // v1.7.1:女神の加護は出ない
+    let rest = pool.filter((s) => !exclude.includes(s.name) && !no.includes(s.name));
     const out = [];
     while (out.length < n && rest.length) {
       const total = rest.reduce((a, s) => a + (s.weight ?? 1), 0);
@@ -348,14 +353,20 @@
       if (c.moveType === "重装" && stage < IKE.ARMOR_FROM) return false;
       return !IKE_NO_CLASSES.includes(c.className) && !IKE_NO_CLASSES.includes(to) && usableWeapons(c).length > 0;
     };
+    // v1.7.2:ふつうのアーケードは、レンジャー・クレリック・ワルキューレを出さない
+    const normalOk = (c) => {
+      const to = promoted && DB.promotionOf(c.className) ? DB.promotionOf(c.className).name : c.className;
+      return !NORMAL_NO_CLASSES.includes(c.className) && !NORMAL_NO_CLASSES.includes(to);
+    };
     let g = null;
-    for (let i = 0; i < (ike ? 200 : 20) && !g; i++) {
+    for (let i = 0; i < 200 && !g; i++) {
       // 5体目まで・8体目からはベオクだけ(ラグズは Lv1 でもベオクの Lv10 くらいの強さがあるため)
       // v1.6.2:アイクモードの12体目からはラグズも出る
       const beorcOnly = (promoted && !strong) || stage < LAGUZ_FROM;
       const n = global.Generator.normalizeInputs(global.RandomChar.randomInputs(rand, beorcOnly ? { race: "ベオク" } : {}));
       if (n.ok) g = global.Generator.generateCharacter(n.value);
       if (g && ike && !ikeOk(g)) g = null;
+      if (g && !ike && !normalOk(g)) g = null;
     }
     const laguz = isLaguz(g);
     // v1.6.2:12体目からのラグズは、上級職の敵のレベル + 3(Lv20まで)。
@@ -404,7 +415,8 @@
     // スキル:5体目から(抽選と同じ。武器スキルとかぶらない)
     const unit = global.Battle.makeUnit(e, e.weapon, "right");
     // v1.6.5:アイクモードでは天空・勇将・瞬殺・援軍は出ない
-    const noSkills = ike ? IKE_NO_ENEMY_SKILLS : [];
+    // v1.6.7:ランダムの敵は(ふつう・アイクとも)女神の加護を持たない。持つのはアシュナードだけ
+    const noSkills = (ike ? IKE_NO_ENEMY_SKILLS : []).concat(NO_ENEMY_SKILLS);
     e.skill = stage >= SKILL_FROM ? global.Battle.drawSkill(unit, rng, noSkills) : null;
     e.extraSkills = [];
     // v1.6.3:アイクモードの18体目はスキル2つ(ランダム・同じものは選ばない)
@@ -457,7 +469,7 @@
   }
 
   function ensureEnemy(state) {
-    if (!state.enemies[state.stage]) state.enemies[state.stage] = makeEnemy(state.stage, state.seed, state.mode);
+    if (!state.enemies[state.stage]) state.enemies[state.stage] = isTeam(state) ? makeTeamEnemies(state.stage, state.seed) : makeEnemy(state.stage, state.seed, state.mode);
     return state.enemies[state.stage];
   }
 
@@ -688,8 +700,120 @@
     return true;
   }
 
+  // ================= v1.7.1:アーケードの3on3(ふつうのアーケードだけ。アイクモードは対象外) =================
+  //   ・キャラを3人選んで11連戦。敵も毎回3人(ランダムに生まれたキャラ。レベル・上級職・スキルは1人のときと同じ)
+  //   ・11体目(EXTRA)は、敵の3人の中に必ずイナがいる(ほかの2人は10体目と同じ強さ)
+  //   ・勝つと3人ともレベルアップ(1人のときと同じ)。スキルは最初に1人ずつ2つから選ぶ。
+  //     勝ったあとのスキルの交換・追加は、3人のうち1人だけ(9体目を倒すと選んだ1人に2つ目を追加。10体目からは、
+  //     2つ目のないキャラなら追加、あるキャラなら1つ目・2つ目のどちらかと交換)
+  //   ・バトルは 3on3 と同じ(王・休み・継承・神官など)
+  const TEAM_SIZE = 3;
+  const isTeam = (state) => !!state && state.team === true;
+  function newMember(char) {
+    const human = lv1Stats(char);
+    delete human.con;
+    return { charId: char.id, level: 1, baseClass: char.className, className: char.className, promoted: false, stats: human, skills: [], weapon: null };
+  }
+  function createTeam(chars, opts = {}) {
+    const rng = opts.rng;
+    const members = chars.slice(0, TEAM_SIZE).map(newMember);
+    const state = {
+      v: 1, mode: "normal", team: true, members,
+      charId: members[0].charId, // 古い画面の部品のため(1人目)
+      skillMode: "carry",
+      seed: opts.seed || String(Math.floor(rng.next() * 1e9)),
+      stage: 1, cleared: 0, level: 1, baseClass: members[0].baseClass, className: members[0].className, promoted: false,
+      stats: members[0].stats, skills: [], weapon: null, weapons: null, seen: {}, bonus: false,
+      enemies: {}, continues: 0, inaTries: 0, stars: 0, done: false, result: null, pending: [],
+    };
+    chars.slice(0, TEAM_SIZE).forEach((c, k) => {
+      state.pending.push({ type: "skill", mode: "start", who: k, options: drawSkills(skillPoolFor(c), 2, [], rng).map((name) => ({ name, from: "random" })) });
+    });
+    return state;
+  }
+  // stage 体目の敵の3人(seed が同じなら同じ敵)。EXTRA はイナ+10体目と同じ強さの2人(イナの位置はランダム)
+  function makeTeamEnemies(stage, seed) {
+    const rng = global.Rng.createSeededRng(`${seed}|team${stage}`);
+    const inaAt = stage === EXTRA ? rng.int(0, TEAM_SIZE - 1) : -1;
+    const out = [];
+    for (let k = 0; k < TEAM_SIZE; k++) {
+      const e = k === inaAt ? ina() : makeEnemy(stage === EXTRA ? STAR_STAGE : stage, `${seed}|t${k}`, "normal");
+      e.id = `arcade-enemy-${stage}-${k}`;
+      if (stage === EXTRA && k !== inaAt) e.extraStage = true;
+      out.push(e);
+    }
+    return out;
+  }
+  // savedList:3人の保存されたキャラ
+  function winTeam(state, savedList, rng) {
+    if (state.done) return state;
+    const stage = state.stage;
+    const enemies = state.enemies[stage] || [];
+    state.cleared = stage;
+    if (stage >= STAR_STAGE) state.stars = Math.max(state.stars, stage === EXTRA ? 2 : 1);
+    if (isFinal(state, stage)) { state.done = true; state.result = "clear"; return state; }
+    state.members.forEach((m, k) => {
+      const saved = savedList[k];
+      const n0 = state.pending.length;
+      m.pending = state.pending; // levelUps / classChange は pending に積む
+      const ups = isLaguz(saved) ? Math.max(0, playerLevelAfter(true, stage) - m.level) : 2;
+      for (let i = 0; i < ups; i++) {
+        if (!isLaguz(saved) && !m.promoted && m.level + 1 >= CLASS_CHANGE_LV && DB.promotionOf(m.baseClass)) classChange(m);
+        else levelUps(m, saved, 1, rng);
+      }
+      delete m.pending;
+      for (let j = n0; j < state.pending.length; j++) state.pending[j].who = k;
+    });
+    // スキル:倒した敵のスキル(3人のだれかが使えるもの)1つ + ランダムの2つ。3人のうち1人だけが交換・追加できる
+    const canAny = (name) => state.members.some((m, k) => !m.skills.includes(name) && usable(savedList[k], m.className, name));
+    const foeSkills = [];
+    for (const e of enemies) for (const n of [e.skill, ...(e.extraSkills || [])]) if (n && !foeSkills.includes(n) && canAny(n)) foeSkills.push(n);
+    const opts = [];
+    if (foeSkills.length) opts.push({ name: rng.pick(foeSkills), from: "enemy" });
+    const pool = DB.skills.filter((sk) => state.members.some((m, k) => usable(savedList[k], m.className, sk.name)));
+    for (const name of drawSkills(pool, 2, opts.map((o) => o.name), rng)) opts.push({ name, from: "random" });
+    if (opts.length) state.pending.push({ type: "skill", mode: "team", add: stage === ADD_SKILL_STAGE, options: opts });
+    state.stage++;
+    return state;
+  }
+  // 3人のうち k 人目にスキルを渡すときの形(add:2つ目として追加 / swap2:1つ目・2つ目のどちらかと交換 / swap:1つ目と交換)
+  function teamSkillMode(state, k) {
+    const m = state.members[k];
+    if (state.cleared >= ADD_SKILL_STAGE && m.skills.length < 2) return "add";
+    return state.cleared > ADD_SKILL_STAGE ? "swap2" : "swap";
+  }
+  const teamCanTake = (state, k, saved, name) => !!state.members[k] && !state.members[k].skills.includes(name) && usable(saved, state.members[k].className, name);
+  // 最初のスキル(who は pending にある)/ 勝ったあとの交換・追加(who:3人の何番目か、slot:swap2 のとき 0 / 1)。name が null なら交換しない
+  function chooseTeamSkill(state, name, who, slot = 0, saved = null) {
+    const p = state.pending[0];
+    if (!p || p.type !== "skill") return false;
+    if (p.mode === "start") {
+      if (!name || !p.options.some((o) => o.name === name)) return false;
+      state.members[p.who].skills = [name];
+      state.pending.shift();
+      return true;
+    }
+    if (p.mode !== "team") return false;
+    if (name) {
+      if (!p.options.some((o) => o.name === name)) return false;
+      const m = state.members[who];
+      if (!m || m.skills.includes(name)) return false;
+      if (saved && !usable(saved, m.className, name)) return false;
+      const mode = teamSkillMode(state, who);
+      if (mode === "add") m.skills = [m.skills[0], name].filter(Boolean);
+      else if (mode === "swap2") m.skills[slot === 1 && m.skills.length > 1 ? 1 : 0] = name;
+      else m.skills[0] = name;
+    }
+    state.pending.shift();
+    return true;
+  }
+
   // 保存された状態が使えるか(キャラが削除されていないか)
   function valid(state, exists) {
+    if (isTeam(state)) {
+      return !!(state.v === 1 && Array.isArray(state.members) && state.members.length === TEAM_SIZE
+        && state.members.every((m) => m && exists(m.charId) && m.stats) && state.enemies);
+    }
     return !!(state && state.v === 1 && state.charId && (isIke(state) || exists(state.charId)) && state.stats && state.enemies);
   }
 
@@ -699,8 +823,9 @@
     STAGES, EXTRA, STAR_STAGE, PROMOTED_FROM, PROMO_BASE, SKILL_FROM, INA_TRIES, CLASS_CHANGE_LV, INA_STATS,
     LAGUZ_FROM, LAGUZ_LV_GAP, enemyLevel, playerLevelAfter, rollLevel, promoteStats, transformed, lv1Stats, skillPoolFor, drawSkills,
     ADD_SKILL_STAGE, MAX_LV, IKE, IKE_LV1, IKE_CON, IKE_GROWTH, KNIGHT_STATS, FERAL_STATS, RAGNELL, REGAL, REGAL_STAGE, LAGUZ_SWORD, LAGUZ_SWORD_STAGE, BANDIT_STAGES, BANDIT_WEAPONS, ROBE_HP, FORGE_STAGE, FORGED_GIFTS, STAT_ITEM_STAGE, STAT_ITEMS, PRAYER_STAGE, PRAYER_SWORD, WEAPON_LIMIT, IKE_DEF_CAP, IKE_INA_DELTA, heldSwords, needsDiscard, ikeIna, bandit, ikeCanUse, isIke, stagesOf, isFinal,
-    blackKnight, feral, ikeChar, savedChar, takeItem, THIRD_SKILLS, IKE_NO_ENEMY_SKILLS, IKE_DEF_CAP_EARLY, ashLeft, DOPE_ITEMS, chooseDope, capOf,
-    ashnard, ASHNARD_STATS, ASHNARD2_STATS, GURGURANT, IKE_NO_CLASSES, isTraining,
+    blackKnight, feral, ikeChar, savedChar, takeItem, THIRD_SKILLS, IKE_NO_ENEMY_SKILLS, NO_ENEMY_SKILLS, IKE_DEF_CAP_EARLY, ashLeft, DOPE_ITEMS, chooseDope, capOf,
+    ashnard, ASHNARD_STATS, ASHNARD2_STATS, GURGURANT, IKE_NO_CLASSES, NORMAL_NO_CLASSES, isTraining,
+    TEAM_SIZE, isTeam, createTeam, makeTeamEnemies, winTeam, teamSkillMode, teamCanTake, chooseTeamSkill, usable,
     makeEnemy, ina, create, ensureEnemy, playerChar, win, lose, giveUp, chooseSkill, valid, inaLeft, stageName,
   };
 })(window);

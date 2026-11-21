@@ -125,6 +125,8 @@
     categoryEffectiveTargets: {
       bow: ["カラス", "クリミア王女", "サギ", "タカ", "デイン国王", "ドラゴンナイト", "ドラゴンマスター", "ファルコンナイト", "ペガサスナイト"],
       wind: ["カラス", "クリミア王女", "サギ", "タカ", "デイン国王", "ドラゴンナイト", "ドラゴンマスター", "ファルコンナイト", "ペガサスナイト"],
+      // v1.6.7:炎(ファイアー・エルファイアー・ボルガノンなど全部)は獣牙族(猫・虎)に特効
+      flame: ["獣牙族"],
     },
 
     // バイオリズム(v1.2.0):命中・回避 ±10、好調は必殺+5
@@ -175,8 +177,9 @@
     shadow: { missPercent: 15 },
     // v1.6.4:手加減は HP・技・速さ +5(ほかの能力値は上がらない。HPは最大HPと今のHP)
     mercy: { amount: 5, stats: ["hp", "skl", "spd"] },
-    // 援軍:ペガサスナイト Lv15(v1.6.4:Lv10→15)・手槍。falconPercent%(v1.6.4:5→8)でファルコンナイト Lv1・ぎんの槍
-    reinforcement: { className: "ペガサスナイト", level: 15, weapon: "lance:手槍", falconPercent: 8, falconLevel: 1, falconWeapon: "lance:ぎんの槍" },
+    // 援軍:ペガサスナイト Lv15(v1.6.4:Lv10→15)・手槍。falconPercent%(v1.6.4:5→8、v1.6.7:8→12)でファルコンナイト Lv1・ぎんの槍
+    // v1.6.7:ファルコンナイトは、ペガサスナイトを falconFromLevel(20)まで上げてからクラスチェンジした強さ
+    reinforcement: { className: "ペガサスナイト", level: 15, weapon: "lance:手槍", falconPercent: 12, falconLevel: 1, falconFromLevel: 20, falconWeapon: "lance:ぎんの槍" },
     // v1.6.4:『衝撃』の麻痺。かかったラウンドは数えず、次のラウンドの終わりに治る(その間スキルが働かない)
     paralysis: { turns: 1 },
     // v1.4.5:エリート(ベオク専用)。開幕に上級職へクラスチェンジ(Lv1)。
@@ -202,6 +205,15 @@
     goddessExempt: { weapons: ["エタルド", "ラグネル"], classes: ["獅子", "タカ(ティバーン)", "カラス(ネサラ)", "赤竜(男)", "赤竜(女)"] },
     // HPが半分以下で発動するスキル(発動したときに演出を出す)
     rageSkills: ["怒り", "勇将"],
+
+    // v1.7.1:スキルルーレット(抽選)に出ないスキル(ガトー指示。スキル選択で選ぶことはできる)
+    noRouletteSkills: ["女神の加護"],
+    // v1.7.1:3on3
+    team: {
+      king: { hp: 4, stats: 2 },              // 王:HP+4(v1.7.3:+5→+4。職業のHPの上限まで)、体格以外の能力値+2(補正には出さない。素の能力値に足す)
+      priestClasses: ["神官", "司祭(男)"],     // パーティにいると、ラウンドの終わりにほかのキャラのHPが回復
+      priestHealPercent: 15,                  // 最大HPの15%(小数は切り上げ)
+    },
 
     stalemateRounds: 10, // HPが動かないラウンドがこれだけ続いたら引き分け
 

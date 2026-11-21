@@ -137,7 +137,7 @@
     return C.rageSkills.filter((n) => hasSkill(u, enemy, n));
   }
 
-  // スキルの抽選(v1.3.4):陽光は魔法系の武器を使うときだけ。女神の加護はめったに出ない(weight)
+  // スキルの抽選(v1.3.4):陽光は魔法系の武器を使うときだけ。女神の加護は v1.7.1 から出ない(Config.noRouletteSkills)
   // v1.4.5:兵種スキル(俊足)は抽選に出ない。エリートはベオク(上級職があるとき)だけ
   // v1.5.0:武器スキルと同じスキルは抽選に出ない(かぶらないように)
   // v1.6.3:使える・使えないの判定は DB.skillFits にまとめた(翼の守護はタカ・カラスだけ、大盾はそれ以外のラグズだけ)
@@ -147,8 +147,10 @@
     return DB.skills.filter((s) => !(ws && s.name === ws) && DB.skillFits(s, who));
   }
   // v1.6.5:exclude に入っているスキルは出さない(アイクモードの敵)
+  // v1.7.1:女神の加護はスキルルーレット(抽選)に出ない(ガトー指示。Config.noRouletteSkills)
   function drawSkill(u, rng, exclude) {
-    const pool = skillPool(u).filter((s) => !(exclude && exclude.includes(s.name)));
+    const no = C.noRouletteSkills || [];
+    const pool = skillPool(u).filter((s) => !(exclude && exclude.includes(s.name)) && !no.includes(s.name));
     const total = pool.reduce((a, s) => a + (s.weight ?? 1), 0);
     let r = rng.next() * total;
     for (const s of pool) { r -= s.weight ?? 1; if (r < 0) return s.name; }
@@ -208,17 +210,31 @@
   }
 
   // v1.5.0:属性の不利(炎<水<雷<風<炎、光⇔闇。天・地はなし)。不利な側は属性の補正が無効
+  // v1.7.2:3on3で属性を受け継ぐと、属性を2つ持つ(char.element2)。属性ごとに不利を見て、効く分だけ足す
+  const elementsOf = (char) => (char ? [char.element, char.element2].filter((x, i, a) => x && a.indexOf(x) === i) : []);
+  const weakOne = (element, enemy) => elementsOf(enemy.char).some((x) => (C.elementWeakTo[element] || []).includes(x));
   function elementWeak(u, enemy) {
     if (!u || !enemy || !u.char || !enemy.char) return false;
-    return (C.elementWeakTo[u.char.element] || []).includes(enemy.char.element);
+    const mine = elementsOf(u.char);
+    return mine.length > 0 && mine.every((x) => weakOne(x, enemy));
   }
   const NO_ELEM = { attack: 0, hit: 0, avoid: 0, defense: 0 };
+  const ELEM_KEYS = ["attack", "hit", "avoid", "defense"];
 
   // 属性の補正(v1.4.3:『気分屋』でバイオリズムが好調なら倍)
   function elemOf(u, enemy) {
     if (elementWeak(u, enemy)) return NO_ELEM;
     if (statsDuel(u, enemy)) return NO_ELEM; // v1.6.4:『能力勝負』はお互いの属性も無効
-    const e = u.elem;
+    let e = u.elem;
+    // v1.7.2:属性が2つのときは、不利でないほうの属性の補正を足す
+    if (u.char && u.char.element2 && enemy && enemy.char) {
+      e = { ...NO_ELEM };
+      for (const x of elementsOf(u.char)) {
+        if (weakOne(x, enemy)) continue;
+        const b = DB.elementBonus[x] || NO_ELEM;
+        for (const k of ELEM_KEYS) e[k] += b[k] || 0;
+      }
+    }
     if (!(hasSkill(u, enemy, "気分屋") && u.bio && u.bio.name === "好調")) return e;
     return { attack: e.attack * 2, hit: e.hit * 2, avoid: e.avoid * 2, defense: e.defense * 2 };
   }
@@ -286,7 +302,9 @@
     if (hasSkill(att, def, "千里眼")) hit += 20;
     // 『護り手』(v1.3.4)は、相手のスキルで能力・命中・必殺が下がらない(v1.4.3:『安定』も)
     const guarded = resistsDown(att, def);
-    if (hasSkill(def, att, "恐怖") && !guarded) hit -= 10;
+    // v1.7.1:3on3では、チームのだれか(生きている控えも)が『恐怖』を持っていれば、相手のキャラ全員に効く(teamFear)
+    const fear = hasSkill(def, att, "恐怖") || (!!def.teamFear && !owns(att, "見切り") && !statsDuel(def, att));
+    if (fear && !guarded) hit -= 10;
     if (hasSkill(def, att, "挑発") && !guarded) hit -= C.taunt.hit; // v1.6.3
     if (hasSkill(att, def, "狙撃")) hit *= 2;
 
@@ -301,7 +319,7 @@
     if (!w.noCrit) {
       crit = w.crit + Math.floor(a.skl / 2) + w.critBonus + bioA.crit + classCrit(att);
       if (hasSkill(att, def, "怒り") && att.hp * 2 <= att.maxHp) crit += 50;
-      if (hasSkill(def, att, "恐怖") && !guarded) crit -= 10;
+      if (fear && !guarded) crit -= 10;
       if (hasSkill(def, att, "挑発")) crit += C.taunt.crit; // v1.6.5:『挑発』相手(挑発された側)の必殺+5
     }
     let critAvoid = d.lck;
@@ -433,25 +451,29 @@
   }
 
   // v1.6.3:『援軍』のキャラ。ペガサスナイト Lv10・手槍(5%でファルコンナイト Lv1・ぎんの槍)。能力値はランダム
-  //   能力値 = 職業の基本値 + 個人差(キャラ作成と同じ 0〜2、HPは0〜3)、ペガサスナイトはそこから成長率(±10)で Lv10 まで上げる
+  //   能力値 = 職業の基本値 + 個人差(キャラ作成と同じ 0〜2、HPは0〜3)、ペガサスナイトはそこから成長率(±10)で Lv15 まで上げる
+  // v1.6.7:ファルコンナイト(12%)は、ペガサスナイトを Lv20 まで上げてからクラスチェンジした強さ(Lv1)
   function reinforcementChar(rng) {
     const R = C.reinforcement;
     const falcon = rng.percent(R.falconPercent);
     const pk = DB.classByName[R.className];
     const p = DB.promotionOf(R.className);
-    const base = falcon && p ? p.base : pk.base, max = falcon && p ? p.max : pk.max;
+    const base = pk.base, max = pk.max;
     const stats = {}, growth = {};
     for (const k of DB.STAT_KEYS) {
       stats[k] = Math.min(base[k] + rng.int(0, k === "hp" ? C.personalBaseMax + 1 : C.personalBaseMax), max[k]);
       growth[k] = Math.max(5, pk.growth[k] + rng.int(C.personalGrowthRange[0], C.personalGrowthRange[1]));
     }
-    const level = falcon ? R.falconLevel : R.level;
-    for (let lv = 1; lv < level; lv++) {
+    const grow = falcon ? R.falconFromLevel : R.level;
+    for (let lv = 1; lv < grow; lv++) {
       for (const k of DB.STAT_KEYS) {
         const g = growth[k];
         stats[k] = Math.min(stats[k] + Math.floor(g / 100) + (rng.percent(g % 100) ? 1 : 0), max[k]);
       }
     }
+    // クラスチェンジ:上級職の基本値 − ペガサスナイトの基本値 を足す(上限は上級職の上限)
+    if (falcon && p) for (const k of DB.STAT_KEYS) stats[k] = Math.max(stats[k], Math.min(stats[k] + (p.base[k] - p.from[k]), p.max[k]));
+    const level = falcon ? R.falconLevel : R.level;
     const rn = global.RandomChar && global.RandomChar.randomName;
     const elements = Object.keys(DB.elementBonus);
     const weapon = falcon ? R.falconWeapon : R.weapon;
@@ -459,7 +481,7 @@
       id: "reinforcement", reinforcement: true, name: rn ? rn("女", () => rng.next()) : "ペガサス", gender: "女", race: "ベオク",
       level, arcadeLv: level, className: falcon ? (p ? p.name : "ファルコンナイト") : R.className, moveType: "飛行",
       element: elements[rng.int(0, elements.length - 1)], kanjiType: "", colorHex: falcon ? "#e8e8ee" : "#7ec8e3",
-      growth, weapons: [weapon], weapon, marks: {}, stats: { ...stats, con: pk.con }, maxStats: { ...max },
+      growth, weapons: [weapon], weapon, marks: {}, stats: { ...stats, con: pk.con }, maxStats: { ...(falcon && p ? p.max : max) },
     };
   }
 
@@ -803,26 +825,31 @@
     let round = 0;
     // v1.6.1:opts.maxRounds(アイクモードの漆黒の騎士はラウンド1だけ)
     let maxRounds = opts.maxRounds || C.maxRounds;
-    // v1.6.4:ラウンドの制限(漆黒の騎士など)は、援軍が戦ったラウンドを数えない(援軍が倒れたら、自分の分のラウンドを戦う)
-    const limited = !!opts.maxRounds;
+    // v1.7.0:3on3。1ラウンドずつ進める。opts.round0:これまでのラウンド数 / opts.oneRound:1ラウンドだけ /
+    //   opts.firstR1Side:ラウンド1の先攻の側(先攻・後攻の交互に使う)/ opts.bench:{ left: [控え], right: [控え] }
+    if (opts.oneRound) { round = opts.round0 || 0; maxRounds = round + 1; }
+    if (opts.firstR1Side) firstR1 = units[opts.firstR1Side];
+    const bench = opts.bench || { left: [], right: [] };
     let drawText = opts.drawText || `${maxRounds}ラウンドで決着がつかず、引き分け`;
     let quietRounds = 0;
     // v1.6.2:変身(phase2)。HPが0になったユニットが phase2 を持っていれば、別の姿で全回復して次のラウンドへ
-    const phaseChange = () => {
-      // v1.6.3:援軍が倒れた → 自分(援軍を呼んだキャラ)に戻って、次のラウンドから戦う
+    // v1.6.3:援軍が倒れた → 自分(援軍を呼んだキャラ)に戻る
+    // v1.6.7:倒れたその場で交代し、そのラウンドの残りの攻撃(自分の側の攻撃・追撃)を自分が行う。
+    //   ラウンドの制限は延ばさない(11体目の漆黒の騎士はラウンド1で終わる)。ラウンドの終わりの化身ゲージなどもふつうに進む
+    const swapBack = () => {
       const r = [left, right].find((x) => x.hp <= 0 && x.returnTo);
-      if (r && other(r).hp > 0) {
-        const allyName = r.name;
-        const owner = r.returnTo;
-        for (const k of Object.keys(r)) delete r[k];
-        Object.assign(r, owner);
-        // v1.6.4:援軍が戦っていたラウンドは、制限のラウンドに数えない(11体目の漆黒の騎士なら、自分がラウンド1つ分を耐える)
-        if (limited) maxRounds = round + (opts.maxRounds || 0);
-        quietRounds = 0;
-        push({ type: "swap", actor: r.side, back: true, forecast: fc(), text: `${allyName}は倒れた!${r.name}が戦う!` });
-        if (r.laguz) push({ type: "gauge", actor: r.side, quiet: true, text: `${r.name}の化身ゲージ:${r.laguz.gauge}` });
-        return true;
-      }
+      if (!r || other(r).hp <= 0) return false;
+      const allyName = r.name;
+      const owner = r.returnTo;
+      for (const k of Object.keys(r)) delete r[k];
+      Object.assign(r, owner);
+      quietRounds = 0;
+      push({ type: "swap", actor: r.side, back: true, forecast: fc(), text: `${allyName}は倒れた!${r.name}が戦う!` });
+      if (r.laguz) push({ type: "gauge", actor: r.side, quiet: true, text: `${r.name}の化身ゲージ:${r.laguz.gauge}` });
+      return true;
+    };
+    const phaseChange = () => {
+      if (swapBack()) return true;
       const u = [left, right].find((x) => x.hp <= 0 && x.phase2);
       if (!u || other(u).hp <= 0) return false;
       const p = u.phase2;
@@ -849,7 +876,8 @@
     const benchStart = (o, foe) => {
       if (round === 1) {
         if (o.laguz) roundOneStart(o);
-        else if (hasSkill(o, foe, "エリート")) promote(o);
+        // v1.7.3:3on3(oneRound)の控えはここではクラスチェンジしない(はじめて出たラウンドに、見えるところでクラスチェンジ)
+        else if (!opts.oneRound && hasSkill(o, foe, "エリート")) promote(o);
       }
       if (round >= C.lateBloomer.fromRound && !o.lateBloom && hasSkill(o, foe, "大器晩成")) {
         o.lateBloom = true; o.maxHp += C.lateBloomer.amount; o.hp += C.lateBloomer.amount;
@@ -910,9 +938,14 @@
 
       // v1.4.5:『エリート』開幕に上級職へクラスチェンジ(Lv1)。v1.6.4:援軍が戦っている間は、控えのキャラが見えないところでクラスチェンジ
       for (const u of [first, second]) if (u.returnTo) benchStart(u.returnTo, other(u));
-      if (round === 1) {
+      // v1.7.0:3on3の控えのキャラも、見えないところで進む(援軍の控えと同じ)
+      for (const side of ["left", "right"]) for (const o of bench[side] || []) if (o.hp > 0) benchStart(o, units[side === "left" ? "right" : "left"]);
+      // v1.7.3:3on3(oneRound)では、ラウンド1だけでなく、はじめて出たラウンド(受け継いだときは次に出たラウンド)にクラスチェンジ
+      //   (前は全体のラウンド1しか見ていなかったので、2ラウンド目から出たキャラ・受け継いだキャラが発動しなかった)
+      if (round === 1 || opts.oneRound) {
         for (const u of [first, second]) {
-          if (u.laguz || !hasSkill(u, other(u), "エリート")) continue;
+          if (u.laguz || u.elited || !hasSkill(u, other(u), "エリート")) continue;
+          u.elited = true;
           const p = promote(u);
           if (p) skillUp(u, "エリート", `${p.to}(Lv1)にクラスチェンジ!`, { elite: p, forecast: fc() });
         }
@@ -928,7 +961,7 @@
       }
 
       // 『能力勝負』(v1.3.4):最初に知らせる
-      if (round === 1 && statsDuel(left, right)) {
+      if ((round === 1 || opts.newPair) && statsDuel(left, right)) {
         const owner = [first, second].find((u) => hasSkill(u, other(u), "能力勝負"));
         skillUp(owner, "能力勝負", "お互いのスキルとバイオリズムが無効に", { forecast: fc() });
       }
@@ -983,17 +1016,20 @@
         if (u.status.turns <= 0) u.status = null;
       }
 
-      attack(first, second);
-      attack(second, first);
-      if (!dead() && calc(first, second).doubles) attack(first, second);
-      if (!dead() && calc(second, first).doubles) attack(second, first);
+      // v1.6.7:援軍が倒れたら、その場で自分に交代して残りの攻撃を続ける(act)
+      const act = (a, d) => { attack(a, d); swapBack(); };
+      swapBack(); // 状態異常で援軍が倒れたとき
+      act(first, second);
+      act(second, first);
+      if (!dead() && calc(first, second).doubles) act(first, second);
+      if (!dead() && calc(second, first).doubles) act(second, first);
       // v1.6.3:『再行動』幸運の確率で、自分だけもう一度攻撃(追撃も含む)。1ラウンドに1回
       for (const u of [first, second]) {
         const foe = other(u);
         if (dead() || !hasSkill(u, foe, "再行動") || u.sleep || !rng.percent(curStats(u, foe).lck)) continue;
         skillUp(u, "再行動", "もう一度攻撃");
-        attack(u, foe);
-        if (!dead() && calc(u, foe).doubles) attack(u, foe);
+        act(u, foe);
+        if (!dead() && calc(u, foe).doubles) act(u, foe);
       }
 
       // 『回復』
@@ -1043,6 +1079,7 @@
       }
       // v1.6.4:援軍が戦っている間の、控えのキャラ(回復・化身ゲージ)
       for (const u of [first, second]) if (!dead() && u.returnTo) benchEnd(u.returnTo, other(u));
+      for (const side of ["left", "right"]) for (const o of bench[side] || []) if (!dead() && o.hp > 0) benchEnd(o, units[side === "left" ? "right" : "left"]);
 
       // 化身ゲージ(ラウンド終了時):化身中は-5(0で化身が解ける)、化身前は+4(20で化身)
       for (const u of [first, second]) {
@@ -1072,8 +1109,24 @@
       }
     }
     // v1.6.4:援軍が倒れたときは、ラウンドの制限に届いていても自分に戻って続ける
-    if ((round < maxRounds || [left, right].some((x) => x.hp <= 0 && x.returnTo)) && phaseChange()) continue;
+    if (round < maxRounds && phaseChange()) continue;
+    swapBack(); // v1.6.7:制限のラウンドの終わりに援軍が倒れていたら、自分に戻して終わる(ラウンドは延ばさない)
     break;
+    }
+    // v1.7.2:3on3は、だれかが倒れたラウンドも続きがあるので、ラウンドの終わりの化身ゲージを進める
+    //   (前は倒れた時点で止まり、残ったキャラ・控えの化身ゲージがそのままだった)
+    if (opts.oneRound && dead()) {
+      for (const side of ["left", "right"]) for (const o of bench[side] || []) if (o.hp > 0) benchEnd(o, units[side === "left" ? "right" : "left"]);
+      for (const u of [left, right]) {
+        if (u.hp <= 0 || !u.laguz || (u.laguz.transformed && u.laguz.fixed)) continue;
+        if (u.laguz.transformed) {
+          u.laguz.gauge = Math.max(0, u.laguz.gauge - C.laguzGauge.decay);
+          if (u.laguz.gauge === 0) u.laguz.transformed = false;
+        } else {
+          gainGauge(u, C.laguzGauge.roundGain);
+          transformIfFull(u);
+        }
+      }
     }
 
     let winner = "draw";
@@ -1094,5 +1147,5 @@
     return { events, winner };
   }
 
-  global.Battle = { reinforcementChar, elementWeak, promote, classEffect, makeUnit, cloneUnit, previewRoundOne, calc, forecast, bonusSummary, transformPlan, simulate, decideFirst, triangle, attackSpeed, biorhythmMod, drawSkill, skillPool, statsDuel, hasSkill, elemOf, classCrit };
+  global.Battle = { reinforcementChar, elementWeak, promote, classEffect, makeUnit, cloneUnit, previewRoundOne, calc, forecast, bonusSummary, transformPlan, simulate, decideFirst, hasPriority, priorityReason, triangle, attackSpeed, biorhythmMod, drawSkill, skillPool, statsDuel, hasSkill, elemOf, classCrit, elementsOf };
 })(window);

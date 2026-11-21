@@ -29,7 +29,7 @@
       <div class="title-box">
         <p class="title-sub">― 名前に宿る力で戦え ―</p>
         <h1 class="title-heading">闘技場バトル</h1>
-        <p class="version">v1.6.6</p>
+        <p class="version">v1.7.3</p>
         <button type="button" class="press-start" id="press-start">Press click</button>
         <nav class="title-menu">
           <button type="button" class="btn btn-main slide-l" data-goto="create">キャラ作成</button>
@@ -45,7 +45,9 @@
           <button type="button" class="btn btn-main mode-btn slide-l" id="btn-mode-arena"><b>闘技場</b><small>1対1で戦う</small></button>
           <button type="button" class="btn btn-main mode-btn slide-r" id="btn-mode-tour"><b>トーナメント</b><small id="tour-mode-note">8〜16人で順位を決める</small></button>
           <button type="button" class="btn btn-main mode-btn slide-l" id="btn-mode-arcade"><b>アーケード</b><small id="arc-mode-note">1人で連戦を勝ち抜く</small></button>
-          <button type="button" class="btn mode-back slide-r" id="btn-mode-back">もどる</button>
+          <!-- v1.7.0:3on3(3体どうしのチーム戦) -->
+          <button type="button" class="btn btn-main mode-btn slide-r" id="btn-mode-3on3"><b>3on3</b><small id="tt-mode-note">3体のチームで戦う</small></button>
+          <button type="button" class="btn mode-back slide-l" id="btn-mode-back">もどる</button>
         </nav>
       </div>
     </section>
@@ -160,7 +162,7 @@
       <h2 class="screen-title">遊び方</h2>
       <div class="howto">
         <nav class="howto-toc panel" aria-label="もくじ">
-          <a href="#ht-flow">遊びの流れ</a><a href="#ht-create">キャラ作成</a><a href="#ht-list">キャラ一覧</a><a href="#ht-prep">バトル準備</a><a href="#ht-tour">トーナメント</a><a href="#ht-arcade">アーケード</a><a href="#ht-battle">バトルのルール</a><a href="#ht-skill">スキル</a><a href="#ht-laguz">ラグズと化身</a><a href="#ht-weapon">武器と錬成</a><a href="#ht-tips">ヒント</a>
+          <a href="#ht-flow">遊びの流れ</a><a href="#ht-create">キャラ作成</a><a href="#ht-list">キャラ一覧</a><a href="#ht-prep">バトル準備</a><a href="#ht-tour">トーナメント</a><a href="#ht-arcade">アーケード</a><a href="#ht-3on3">3on3</a><a href="#ht-battle">バトルのルール</a><a href="#ht-skill">スキル</a><a href="#ht-laguz">ラグズと化身</a><a href="#ht-weapon">武器と錬成</a><a href="#ht-tips">ヒント</a>
         </nav>
 
         <article class="panel howto-sec" id="ht-flow">
@@ -168,7 +170,7 @@
           <ol class="howto-steps">
             <li><b>キャラ作成</b>:名前・性別・種族・好きな漢字・好きな色・生年月日を入れると、キャラが生まれます。</li>
             <li><b>保存</b>:気に入ったら「このキャラを保存」。キャラ一覧とバトルで使えます。</li>
-            <li><b>バトル</b>:「闘技場」「トーナメント」「アーケード」から選びます。闘技場は1Pと2Pのキャラと武器を選んで「対戦開始」。戦いは自動で進みます。</li>
+            <li><b>バトル</b>:「闘技場」「トーナメント」「アーケード」「3on3」から選びます。闘技場は1Pと2Pのキャラと武器を選んで「対戦開始」。戦いは自動で進みます。</li>
           </ol>
           <p>同じ入力からは、いつでも同じキャラが生まれます。友だちと同じ入力をすれば、同じキャラで戦えます。</p>
         </article>
@@ -231,6 +233,26 @@
           </ul>
         </article>
 
+        <article class="panel howto-sec" id="ht-3on3">
+          <h3>3on3</h3>
+          <ul class="howto-ul">
+            <li>キャラ一覧から<b>3人</b>と、それぞれの武器を選んでチームを作り、コンピューターのチーム(3人)と戦います。相手は「キャラ一覧から」(自分のチーム以外)か「新しく生まれたキャラ」から選べます。準備の「人数」で<b>4on4</b>にもできます。</li>
+            <li><b>2P対戦</b>:準備の「相手」で「2P対戦」を選ぶと、1台のスマホ・iPadを交代で使って2人で対戦できます。チームを選ぶときと、ラウンドごとに出すキャラを選ぶときは「1Pの番」「2Pの番」の幕が出るので、相手に画面を見せないで渡してください。戦いは2人で見ます。</li>
+            <li>スキルは対戦の前に、6人ともランダムで1つずつ決まります(援軍は出ません)。</li>
+            <li>3人のうち1人がランダムで<b>王</b>になります(HP+4・体格以外の能力値+2。HPは職業の上限まで)。<b>王が倒れたら負け</b>です。相手の王はだれか分かりません。</li>
+            <li><b>ラウンドごと</b>に、出すキャラを選んで「決定」を押します。相手も同時に選ぶので、だれが出てくるかは始まるまで分かりません。<b>2ラウンド続けて出たキャラは、次の1ラウンド休み</b>です(出せるキャラがほかにいないときは別)。1ラウンド出たキャラには「連戦中」の印が付きます。</li>
+            <li>選ぶ画面には、そのラウンドの<b>先攻・後攻</b>が出ます(先攻の武器や『待ち伏せ』のキャラが出ると変わります)。「結果まで飛ばす」を押すと、そこから先は両方おまかせで最後まで進みます。</li>
+            <li>準備の「武器変更」をONにすると、選ぶ画面で出すキャラ(ベオク)の<b>武器を対戦中に変えられます</b>。相手から見えるのは、そのキャラが前に出たときの武器です。</li>
+            <li>自分のキャラを選ぶと、相手のいちばん左のキャラに自動でカーソルが合います。<b>一度戦った相手</b>をタップすると、そのキャラと戦った場合の<b>戦闘予測</b>が出ます(まだ戦っていない相手の予測は見えません)。</li>
+            <li>名前・職業・属性・<b>バイオリズム</b>(⤴好調・→普通・⤵不調)は、全員最初から分かります。自分のキャラのカードには、付いている<b>補正</b>(属性・バイオリズム・武器など)も出ます。</li>
+            <li>相手の能力値は分かりません。出てきたキャラは、武器・HP・スキルが分かります(スキルはラウンドの始めに見えます)。</li>
+            <li>最後の1人になると、直前に倒れたキャラ(3on3では2人目)の<b>スキルと属性を受け継ぎ</b>ます(属性は2つになり、補正も2つ分)。『恐怖』はチームのだれかが持っていれば相手の全員に効きます。<b>神官</b>がいると、ラウンドの終わりにほかのキャラのHPが15%回復します。回復したキャラは、次の選ぶ画面でHPのバーが伸びる演出が出ます。</li>
+            <li>HP・化身ゲージ・状態異常・下がった能力は、キャラごとに続きます。控えのキャラも、化身ゲージ(ラウンドごとに化身前は+4、化身中は-5)・空の祝福・回復・大器晩成などが見えないところで進みます。『エリート』は、はじめて出たラウンドにクラスチェンジします。</li>
+            <li>相手の王を倒せば勝ち。60ラウンドで決着がつかないときなどは、チームの残りHPの割合で判定します。</li>
+            <li>アーケードでも、モードの「3on3」で3人のチームで11連戦できます(EXTRAには必ずイナがいます。スキルの交換・追加は勝つたびに3人のうち1人だけ)。</li>
+          </ul>
+        </article>
+
         <article class="panel howto-sec" id="ht-battle">
           <h3>バトルのルール</h3>
           <dl class="howto-dl">
@@ -252,7 +274,7 @@
           <ul class="howto-ul">
             <li>対戦のはじめに、ルーレットで1人1つスキルが決まります(OFFにもできます)。多くは<b>技の数値%</b>の確率で発動します。</li>
             <li>スキルの色:<span class="hs-chip">紫</span>抽選のスキル、<span class="hs-chip ws">緑の枠</span>武器についたスキル、<span class="hs-chip cs">オレンジ</span>兵種スキル(剣士・ソードマスター・アーチャー・スナイパーの必殺+5、魔道士(炎特化・男)の俊足、バーサーカーの必殺+10、シーフ・アサシンの盗む)。</li>
-            <li>『流星』『天空』などの<b>奥義</b>は、発動すると大きな演出が出ます。『女神の加護』はめったに出ないレアスキルです。</li>
+            <li>『流星』『天空』などの<b>奥義</b>は、発動すると大きな演出が出ます。『女神の加護』はスキルルーレットには出ません(スキル選択では選べます)。</li>
             <li>『見切り』は相手のスキルを、『能力勝負』はお互いのスキル・バイオリズム・属性を無効にします(『能力勝負』と相手の『見切り』は相殺)。</li>
             <li>『ぶちかまし』(体格×1.5%で、攻撃のあとに体格分のダメージをもう一撃)、『エリート』(ベオクだけ。開幕に上級職になって戦う)、『大器晩成』(5ラウンド目から体格以外の能力値+5)、『地の祝福』(状態異常を受けず、ラウンドのはじめに下がった能力を元に戻す)、『衝撃』(当たると、幸運÷2の確率で相手を麻痺させてスキルを止める)。</li>
             <li>スキルの効果は、タイトルの<b>データ集</b>でいつでも確かめられます。</li>
@@ -266,7 +288,7 @@
             <li>ラグズは<b>化身前</b>で始まります。化身前は爪・くちばし・ブレスの威力が0です。</li>
             <li><b>化身ゲージ</b>が20になると、その場で化身して大きく強くなります。初期値は幸運(タカ+6・カラス+8・猫+4・虎+2)。</li>
             <li>化身前はラウンドごとに+4、ダメージを受けるたびに+3、攻撃が当たるたびに+1。化身中はラウンドの終わりに-5され、0で化身が解けます(また溜まります)。</li>
-            <li>弓・風魔法は鳥(タカ・カラス)に、ラグズ○○などの武器はラグズに特効です。</li>
+            <li>弓・風魔法は鳥(タカ・カラス)に、炎魔法は獣牙族(猫・虎)に、ラグズ○○などの武器はラグズに特効です。</li>
           </ul>
         </article>
 
@@ -285,7 +307,7 @@
           <ul class="howto-ul">
             <li>バトル中は「速度:はやい」で2倍速、「結果まで飛ばす」ですぐに結果が見られます。</li>
             <li>「スキルそのままでもう一度」で、同じスキルのまま何度も試せます。</li>
-            <li>スマホは縦向きでも横向きでも遊べます。縦向きのバトル準備は、上のタブで「1P・2P・対戦」を切りかえます。何本先取などは「⚙設定」にあります。</li>
+            <li>スマホは縦向きでも横向きでも遊べます。縦向きのバトル準備は、上のタブで「1P・2P・対戦」を切りかえます。スキルの効果は「i」ボタンで開きます。何本先取などは「⚙設定」にあります。</li>
             <li>縦向きのバトルでは、スキルの札をタップすると説明が出ます。</li>
           </ul>
           <div class="card-actions"><button type="button" class="btn btn-main" data-goto="create">キャラを作る</button><button type="button" class="btn" data-goto="prep">バトルへ</button></div>
@@ -357,9 +379,13 @@
       <div class="tsetup asetup" id="asetup">
         <div class="panel tsetup-rules">
           <div class="ts-row"><span class="ts-k">モード</span><div class="ts-v bo-row" id="as-mode">
-            <button type="button" class="bo-btn" data-v="normal" title="自分のキャラで11連戦">ふつう</button><button type="button" class="bo-btn" data-v="ike" title="アイクで全20面">アイクモード</button></div></div>
+            <button type="button" class="bo-btn" data-v="normal" title="自分のキャラで11連戦">ふつう</button><button type="button" class="bo-btn" data-v="ike" title="アイクで全20面">アイクモード</button><button type="button" class="bo-btn" data-v="team" title="3人のチームで11連戦(v1.7.1)">3on3</button></div></div>
+          <!-- v1.6.7:スマホでは、モードの説明は「▼」ボタンで下にスライドして開く(PCはいつも表示) -->
+          <button type="button" class="as-more" id="as-more" aria-expanded="false" aria-controls="as-explain"><span>モードの説明</span><i aria-hidden="true">▼</i></button>
+          <div class="as-explain" id="as-explain"><div class="as-explain-in">
           <p class="ts-note" id="as-mode-note"></p>
           <ul class="ts-note as-rules" id="as-rules"></ul>
+          </div></div>
         </div>
         <div class="panel tsetup-pick" id="as-pick">
           <div class="ts-pick-head"><span id="as-picked" class="ts-picked"></span></div>
@@ -374,6 +400,42 @@
     </section>
 
     <!-- v1.6.0:アーケード(勝ち抜きの表・次の敵・スキルの選択・結果) -->
+    <!-- v1.7.0:3on3の準備(相手・自分のチーム3体と武器) -->
+    <section id="screen-ttsetup" class="screen">
+      <h2 class="screen-title">3on3の準備</h2>
+      <div class="tsetup ttsetup" id="ttsetup">
+        <div class="panel tsetup-rules">
+          <div class="ts-row"><span class="ts-k">相手</span><div class="ts-v bo-row" id="tt-foe">
+            <button type="button" class="bo-btn" data-v="list" title="キャラ一覧から3人(自分のチーム以外)。足りなければ新しく生まれたキャラ">キャラ一覧から</button><button type="button" class="bo-btn" data-v="new" title="ランダムに生まれた、だれも知らないキャラ3人">新しく生まれたキャラ</button><button type="button" class="bo-btn" data-v="2p" title="1台のスマホ・iPadを交代で使って、2人で対戦する">2P対戦</button></div></div>
+          <!-- v1.7.3:人数(4on4。モードの名前は3on3のまま)と、対戦中の武器の変更 -->
+          <div class="ts-row"><span class="ts-k">人数</span><div class="ts-v bo-row" id="tt-size">
+            <button type="button" class="bo-btn" data-v="3">3on3</button><button type="button" class="bo-btn" data-v="4">4on4</button></div></div>
+          <div class="ts-row"><span class="ts-k" title="対戦中の武器の変更">武器変更</span><div class="ts-v bo-row" id="tt-wchange" title="対戦中、選ぶ画面で出すキャラ(ベオク)の武器を変えられる">
+            <button type="button" class="bo-btn" data-v="off">OFF</button><button type="button" class="bo-btn" data-v="on">ON</button></div></div>
+          <!-- スマホでは、ルールの説明は「▼」ボタンで開く(アーケードと同じ) -->
+          <button type="button" class="as-more" id="tt-more" aria-expanded="false" aria-controls="tt-explain"><span>ルールの説明</span><i aria-hidden="true">▼</i></button>
+          <div class="as-explain" id="tt-explain"><div class="as-explain-in">
+          <p class="ts-note" id="tt-foe-note"></p>
+          <ul class="ts-note as-rules" id="tt-rules"></ul>
+          </div></div>
+        </div>
+        <div class="panel tsetup-pick">
+          <div class="ts-pick-head">
+            <span id="tt-picked" class="ts-picked"></span>
+            <div class="spacer"></div>
+            <button type="button" class="btn btn-small" id="tt-random">残りをランダムで選ぶ</button>
+            <button type="button" class="btn btn-small" id="tt-clear">選び直す</button>
+          </div>
+          <ul class="ts-chars" id="tt-chars"></ul>
+        </div>
+        <div class="panel tt-team" id="tt-team"></div>
+        <div class="ts-start">
+          <button type="button" class="btn btn-main" id="tt-start" disabled>3on3開始</button>
+          <p class="muted" id="tt-start-note"></p>
+        </div>
+      </div>
+    </section>
+
     <section id="screen-arcade" class="screen">
       <h2 class="screen-title">アーケード</h2>
       <p class="tour-rule muted" id="arc-rule"></p>
@@ -387,6 +449,8 @@
 
     <!-- バトル -->
     <section id="screen-battle" class="screen">
+      <!-- v1.7.0:3on3のチーム(左:自分 右:相手。相手は出てきたキャラだけ一部公開) -->
+      <div class="tt-strip" id="tt-strip" hidden></div>
       <div class="arena" id="arena">
         <div class="fighter" data-side="left"></div>
         <div class="arena-mid">
@@ -417,9 +481,18 @@
             <button type="button" class="btn btn-main" id="btn-tour-next">トーナメント表へ</button>
           </div>
         </div>
+        <!-- v1.7.0:3on3が終わったとき -->
+        <div class="tour-result" id="tt-result" hidden>
+          <div class="tt-reveal" id="tt-reveal"></div>
+          <div class="result-buttons">
+            <button type="button" class="btn btn-main" id="btn-tt-again">同じチームで次の相手と戦う</button>
+            <button type="button" class="btn" id="btn-tt-setup">チームを選び直す</button>
+          </div>
+        </div>
         <!-- v1.6.0:アーケードの試合が終わったとき -->
         <div class="tour-result" id="arc-result" hidden>
           <p class="tour-swap-text" id="arc-result-text"></p>
+          <div class="tt-reveal" id="tt-arc-reveal"></div>
           <div class="result-buttons">
             <button type="button" class="btn btn-main" id="btn-arc-continue">コンティニュー</button>
             <button type="button" class="btn btn-main" id="btn-arc-next">次へ</button>
@@ -478,6 +551,32 @@
   </div>
 
   <!-- スキルルーレット -->
+  <!-- v1.7.0:3on3。ラウンドの前に、出すキャラを選ぶ(最初はスキル抽選も) -->
+  <div id="tt-pick" class="overlay tt-pick" hidden>
+    <div class="tt-box" role="dialog" aria-labelledby="tt-pick-title">
+      <p class="tt-title" id="tt-pick-title"></p>
+      <p class="tt-sub" id="tt-pick-sub"></p>
+      <!-- v1.7.3:このラウンドの先攻・後攻 -->
+      <p class="tt-order" id="tt-order" hidden></p>
+      <div class="tt-row mine" id="tt-pick-mine"></div>
+      <p class="tt-vs">VS</p>
+      <div class="tt-row foe" id="tt-pick-foe"></div>
+      <!-- v1.7.1:戦闘予測(自分のキャラと相手のキャラを選ぶと出る)と、いつも出ている決定ボタン -->
+      <div class="tt-fc" id="tt-fc" aria-live="polite"></div>
+      <!-- v1.7.3:対戦中の武器の変更(設定がONのとき) -->
+      <div class="tt-wc-box" id="tt-wc-box" hidden></div>
+      <div class="tt-pick-btns"><button type="button" class="btn btn-main" id="tt-decide" disabled>決定</button><button type="button" class="btn btn-small" id="tt-auto">おまかせ</button><button type="button" class="btn btn-small" id="tt-skipall" title="ここから先は両方おまかせで、最後まで飛ばす">結果まで飛ばす</button></div>
+    </div>
+  </div>
+  <!-- v1.7.3:2P対戦の交代の幕(うしろの画面は見えない) -->
+  <div id="tt-cover" class="overlay tt-cover" hidden>
+    <div class="tt-cover-box" role="dialog" aria-labelledby="tt-cover-title">
+      <p class="tt-cover-title" id="tt-cover-title"></p>
+      <p class="tt-cover-sub" id="tt-cover-sub"></p>
+      <button type="button" class="btn btn-main" id="tt-cover-btn"></button>
+    </div>
+  </div>
+
   <div id="roulette" class="overlay" hidden>
     <div class="roulette-box">
       <p class="roulette-title" id="roulette-title">スキル抽選</p>
@@ -516,6 +615,7 @@
   <script src="js/battle.js"></script>
   <script src="js/tournament.js"></script>
   <script src="js/arcade.js"></script>
+  <script src="js/teambattle.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/main.js"></script>

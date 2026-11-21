@@ -53,7 +53,7 @@
   :where(body:has(#screen-prep.active, #screen-battle.active)) .prep-side .stat-element .element-chip { font-size: 8px; }
   :where(body:has(#screen-prep.active, #screen-battle.active)) .prep-side .stat-element .element-chip .badge { width: 14px; height: 14px; }
   :where(body:has(#screen-prep.active, #screen-battle.active)) .weapon-head { margin: 2px 0 0; font-size: 11px; }
-  :where(body:has(#screen-prep.active, #screen-battle.active)) .weapon-head .wtype { width: 16px; height: 16px; font-size: 9px; margin-left: 4px; }
+  :where(body:has(#screen-prep.active, #screen-battle.active)) .weapon-head .wtype { width: 16px; height: 16px; font-size: 9px; margin-left: 4px; min-width: 0; padding: 0; }
   :where(body:has(#screen-prep.active, #screen-battle.active)) .weapon-list { display: flex; flex-direction: column; gap: 2px; min-height: 0; }
   :where(body:has(#screen-prep.active, #screen-battle.active)) .weapon-choice { min-height: 0; padding: 3px 7px; gap: 0 6px; border-radius: 5px; grid-template-columns: 1fr auto; }
   :where(body:has(#screen-prep.active, #screen-battle.active)) .weapon-choice .w-name { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -161,6 +161,8 @@
   :where(body:has(#screen-prep.active, #screen-battle.active)) .head-bio .bio svg { width: 34px; }
   :where(body:has(#screen-prep.active, #screen-battle.active)) #screen-battle .fighter-head .element-bonus,
   :where(body:has(#screen-prep.active, #screen-battle.active)) #screen-prep .fighter-head .element-bonus { display: none; }
+  :where(body:has(#screen-prep.active, #screen-battle.active)) #screen-battle .fighter-head .element-chip,
+  :where(body:has(#screen-prep.active, #screen-battle.active)) #screen-prep .fighter-head .element-chip { padding-right: 0; }
   :where(body:has(#screen-prep.active, #screen-battle.active)) #screen-battle .fighter-head .badges .badge.tribe { display: none; }
   :where(body:has(#screen-prep.active, #screen-battle.active)) .fc-k { font-size: 9px; }
   :where(body:has(#screen-prep.active, #screen-battle.active)) .fc-plan .fc-k { font-size: 8px; }
