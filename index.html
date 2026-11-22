@@ -29,7 +29,7 @@
       <div class="title-box">
         <p class="title-sub">― 名前に宿る力で戦え ―</p>
         <h1 class="title-heading">闘技場バトル</h1>
-        <p class="version">v1.7.3</p>
+        <p class="version">v1.7.5</p>
         <button type="button" class="press-start" id="press-start">Press click</button>
         <nav class="title-menu">
           <button type="button" class="btn btn-main slide-l" data-goto="create">キャラ作成</button>
@@ -42,12 +42,21 @@
         <!-- v1.5.0:バトルを押すと、メニューが左右の端に引っ込み、モードが左右から出てくる -->
         <!-- v1.6.0:動きはタイトルのメニュー(キャラ作成〜遊び方)と同じ。全部の項目が同じタイミングでスライドする。アーケードを追加 -->
         <nav class="mode-menu" aria-label="バトルのモード">
-          <button type="button" class="btn btn-main mode-btn slide-l" id="btn-mode-arena"><b>闘技場</b><small>1対1で戦う</small></button>
-          <button type="button" class="btn btn-main mode-btn slide-r" id="btn-mode-tour"><b>トーナメント</b><small id="tour-mode-note">8〜16人で順位を決める</small></button>
-          <button type="button" class="btn btn-main mode-btn slide-l" id="btn-mode-arcade"><b>アーケード</b><small id="arc-mode-note">1人で連戦を勝ち抜く</small></button>
+          <!-- v1.7.4:3on3はモードから外し、闘技場・アーケードの中で「1対1 / 3on3」を選ぶ(同じ場所に、同じ動きで出てくる) -->
+          <button type="button" class="btn btn-main mode-btn slide-l" data-group="main" id="btn-mode-arena"><b>闘技場</b><small id="arena-mode-note">1対1か3on3で戦う</small></button>
+          <button type="button" class="btn btn-main mode-btn slide-r" data-group="main" id="btn-mode-tour"><b>トーナメント</b><small id="tour-mode-note">8〜16人で順位を決める</small></button>
+          <button type="button" class="btn btn-main mode-btn slide-l" data-group="main" id="btn-mode-arcade"><b>アーケード</b><small id="arc-mode-note">1人もしくは3on3で連戦を勝ち抜く</small></button>
+          <button type="button" class="btn mode-back slide-r" data-group="main" id="btn-mode-back">もどる</button>
+          <!-- v1.7.4:闘技場 → 1対1 / 3on3 -->
+          <button type="button" class="btn btn-main mode-btn slide-l" data-group="arena" id="btn-arena-1v1" hidden><b>1対1</b><small>キャラ1人どうしで戦う</small></button>
           <!-- v1.7.0:3on3(3体どうしのチーム戦) -->
-          <button type="button" class="btn btn-main mode-btn slide-r" id="btn-mode-3on3"><b>3on3</b><small id="tt-mode-note">3体のチームで戦う</small></button>
-          <button type="button" class="btn mode-back slide-l" id="btn-mode-back">もどる</button>
+          <button type="button" class="btn btn-main mode-btn slide-r" data-group="arena" id="btn-mode-3on3" hidden><b>3on3</b><small id="tt-mode-note">3体のチームで戦う</small></button>
+          <button type="button" class="btn mode-back slide-l" data-group="arena" id="btn-arena-back" hidden>もどる</button>
+          <!-- v1.7.4:アーケード → 1対1 / 3on3 / アイクモード -->
+          <button type="button" class="btn btn-main mode-btn slide-l" data-group="arcade" data-arc="normal" id="btn-arc-normal" hidden><b>1対1</b><small id="arc-normal-note">1人で11連戦を勝ち抜く</small></button>
+          <button type="button" class="btn btn-main mode-btn slide-r" data-group="arcade" data-arc="team" id="btn-arc-team" hidden><b>3on3</b><small id="arc-team-note">3人のチームで11連戦を勝ち抜く</small></button>
+          <button type="button" class="btn btn-main mode-btn slide-l" data-group="arcade" data-arc="ike" id="btn-arc-ike" hidden><b>アイクモード</b><small>アイクで全20面を勝ち抜く</small></button>
+          <button type="button" class="btn mode-back slide-r" data-group="arcade" id="btn-arcsub-back" hidden>もどる</button>
         </nav>
       </div>
     </section>
@@ -170,7 +179,7 @@
           <ol class="howto-steps">
             <li><b>キャラ作成</b>:名前・性別・種族・好きな漢字・好きな色・生年月日を入れると、キャラが生まれます。</li>
             <li><b>保存</b>:気に入ったら「このキャラを保存」。キャラ一覧とバトルで使えます。</li>
-            <li><b>バトル</b>:「闘技場」「トーナメント」「アーケード」「3on3」から選びます。闘技場は1Pと2Pのキャラと武器を選んで「対戦開始」。戦いは自動で進みます。</li>
+            <li><b>バトル</b>:「闘技場」「トーナメント」「アーケード」から選びます。闘技場は「1対1」か「3on3」、アーケードは「1対1」「3on3」「アイクモード」を続けて選びます。闘技場の1対1は1Pと2Pのキャラと武器を選んで「対戦開始」。戦いは自動で進みます。</li>
           </ol>
           <p>同じ入力からは、いつでも同じキャラが生まれます。友だちと同じ入力をすれば、同じキャラで戦えます。</p>
         </article>
@@ -236,20 +245,14 @@
         <article class="panel howto-sec" id="ht-3on3">
           <h3>3on3</h3>
           <ul class="howto-ul">
-            <li>キャラ一覧から<b>3人</b>と、それぞれの武器を選んでチームを作り、コンピューターのチーム(3人)と戦います。相手は「キャラ一覧から」(自分のチーム以外)か「新しく生まれたキャラ」から選べます。準備の「人数」で<b>4on4</b>にもできます。</li>
-            <li><b>2P対戦</b>:準備の「相手」で「2P対戦」を選ぶと、1台のスマホ・iPadを交代で使って2人で対戦できます。チームを選ぶときと、ラウンドごとに出すキャラを選ぶときは「1Pの番」「2Pの番」の幕が出るので、相手に画面を見せないで渡してください。戦いは2人で見ます。</li>
-            <li>スキルは対戦の前に、6人ともランダムで1つずつ決まります(援軍は出ません)。</li>
-            <li>3人のうち1人がランダムで<b>王</b>になります(HP+4・体格以外の能力値+2。HPは職業の上限まで)。<b>王が倒れたら負け</b>です。相手の王はだれか分かりません。</li>
-            <li><b>ラウンドごと</b>に、出すキャラを選んで「決定」を押します。相手も同時に選ぶので、だれが出てくるかは始まるまで分かりません。<b>2ラウンド続けて出たキャラは、次の1ラウンド休み</b>です(出せるキャラがほかにいないときは別)。1ラウンド出たキャラには「連戦中」の印が付きます。</li>
-            <li>選ぶ画面には、そのラウンドの<b>先攻・後攻</b>が出ます(先攻の武器や『待ち伏せ』のキャラが出ると変わります)。「結果まで飛ばす」を押すと、そこから先は両方おまかせで最後まで進みます。</li>
-            <li>準備の「武器変更」をONにすると、選ぶ画面で出すキャラ(ベオク)の<b>武器を対戦中に変えられます</b>。相手から見えるのは、そのキャラが前に出たときの武器です。</li>
-            <li>自分のキャラを選ぶと、相手のいちばん左のキャラに自動でカーソルが合います。<b>一度戦った相手</b>をタップすると、そのキャラと戦った場合の<b>戦闘予測</b>が出ます(まだ戦っていない相手の予測は見えません)。</li>
-            <li>名前・職業・属性・<b>バイオリズム</b>(⤴好調・→普通・⤵不調)は、全員最初から分かります。自分のキャラのカードには、付いている<b>補正</b>(属性・バイオリズム・武器など)も出ます。</li>
-            <li>相手の能力値は分かりません。出てきたキャラは、武器・HP・スキルが分かります(スキルはラウンドの始めに見えます)。</li>
-            <li>最後の1人になると、直前に倒れたキャラ(3on3では2人目)の<b>スキルと属性を受け継ぎ</b>ます(属性は2つになり、補正も2つ分)。『恐怖』はチームのだれかが持っていれば相手の全員に効きます。<b>神官</b>がいると、ラウンドの終わりにほかのキャラのHPが15%回復します。回復したキャラは、次の選ぶ画面でHPのバーが伸びる演出が出ます。</li>
-            <li>HP・化身ゲージ・状態異常・下がった能力は、キャラごとに続きます。控えのキャラも、化身ゲージ(ラウンドごとに化身前は+4、化身中は-5)・空の祝福・回復・大器晩成などが見えないところで進みます。『エリート』は、はじめて出たラウンドにクラスチェンジします。</li>
-            <li>相手の王を倒せば勝ち。60ラウンドで決着がつかないときなどは、チームの残りHPの割合で判定します。</li>
-            <li>アーケードでも、モードの「3on3」で3人のチームで11連戦できます(EXTRAには必ずイナがいます。スキルの交換・追加は勝つたびに3人のうち1人だけ)。</li>
+            <li>バトル → 闘技場 → 3on3。キャラ一覧から<b>3人</b>と、それぞれの武器を選んでチームを作り(選んだキャラの能力値と武器が右に出ます)、コンピューターのチーム(3人)と戦います。相手は「キャラ一覧から」(自分のチーム以外)・「新しく生まれたキャラ」・<b>2P対戦</b>(1台のスマホ・iPadを交代で使う。選ぶときは「1Pの番」「2Pの番」の幕が出ます)から選べます。</li>
+            <li><b>勝ち方</b>:3人のうち1人がランダムで「<b>王</b>」(少し強い)。<b>相手の王を倒したら勝ち</b>、自分の王が倒れたら負け。相手の王がだれかは、終わるまで分かりません。</li>
+            <li><b>出し方</b>:ラウンドごとに1人を選んで「決定」。相手も同時に選び、その2人で1ラウンド戦います。一度戦ったキャラは、全員が戦い終わるまで出せません(<b>フェイズ</b>)。出せるのが1人なら、選ばずにそのまま戦います。</li>
+            <li><b>続くもの</b>:HP・状態異常・下がった能力は、控えに戻ってもそのまま。化身ゲージや回復は、控えでも時間どおり進みます。</li>
+            <li><b>見えるもの</b>:相手の名前・職業・属性・調子(⤴→⤵)は最初から。武器・HP・スキル・補正・戦闘予測は、一度出てきたら。能力値と王は終わるまで秘密です。</li>
+            <li><b>逆転</b>:王がひとりになると、1人目に倒れた仲間の属性と、2人目に倒れた仲間の属性とスキルを受け継ぎます。<b>神官</b>がいると、フェイズが変わるたびに仲間のHPが15%回復します。</li>
+            <li>30ラウンドで決着しないときは、チームの残りHPの割合で判定します。アーケードでも「3on3」で3人のチームで11連戦できます(「残りをランダムで選ぶ」もあります)。</li>
+            <li class="howto-more"><b>くわしく</b>:王はHP+3(職業の上限まで)・体格以外+2。スキルは対戦の前に全員ランダムで1つずつ(援軍も出ます。援軍は倒れるまで代わりに戦います)。『恐怖』はチームのだれかが持てば相手の全員に効きます。ポイズン・燃焼は3on3では4ラウンド(出たラウンドで数える)。『エリート』は、はじめて出たときにクラスチェンジ。先に全員が戦ったチームは、生きているだれでも出せます。準備の「その他の設定」で、人数(<b>4on4</b>)と<b>対戦中の武器の変更</b>(ベオク)を選べます。</li>
           </ul>
         </article>
 
@@ -264,7 +267,7 @@
             <dt>3すくみ</dt><dd>剣 → 斧 → 槍 → 剣、炎 → 風 → 雷 → 炎。有利なら命中+10・威力+1、不利なら逆。</dd>
             <dt>属性</dt><dd>入力したすべての項目から、ランダムで決まります(天・地・光・闇は出にくい)。炎(攻撃+2・命中+10)、水(攻撃+2・防御+2)、風(命中・回避+10)、雷(回避+10・防御+2)、光(命中+10・防御+2)、闇(攻撃+2・回避+10)、天(命中+18)、地(回避+15)。</dd>
             <dt>属性の不利</dt><dd>炎は水に、水は雷に、雷は風に、風は炎に弱く、光と闇はお互いに弱い(天・地は弱点なし)。不利な側は属性の補正がなくなります(「不利」の印)。</dd>
-            <dt>引き分け</dt><dd>60ラウンドで決着がつかないか、10ラウンド続けてお互いのHPが減らないと引き分けです。</dd>
+            <dt>引き分け</dt><dd>30ラウンドで決着がつかないか、10ラウンド続けてお互いのHPが減らないと引き分けです。</dd>
           </dl>
           <p>N本先取では、2試合目からは前の試合で後攻だったキャラが先攻です。お互いあと1勝(1-1、2-2)になると「最終試合」になります。</p>
         </article>
@@ -297,7 +300,7 @@
           <ul class="howto-ul">
             <li>★はレア度です。★が多いほど出にくく、強い武器が多くなります。すべての武器は、タイトルの<b>データ集</b>で見られます。</li>
             <li><b>錬成</b>:てつ・はがね・細身・どくの武器、手槍・手斧、ファイアー・サンダー・ウインド・ナイフ・ダガー、エル魔法、スキル付きの武器(★2)のうち1本が錬成されていることがあります。錬成された武器は名前と数値が<span class="forged">緑</span>になり、「錬成 威+1 命+7」のように中身が出ます(威力+0〜5・命中+0〜25・必殺+0〜10・重さ-0〜5)。★3以上の武器を持っているキャラには付きません。</li>
-            <li>手斧・手槍などは、ダメージを与えると相手の速さ-1(重なります)。ポイズン・燃焼は毎ラウンドHPが減ります。</li>
+            <li>手斧・手槍などは、ダメージを与えると相手の速さ-1(重なります)。ポイズン・燃焼は毎ラウンドの終わりにHPが減ります。</li>
             <li>武器の説明は、武器の下に短く書いてあります。マウスを乗せると、もっと詳しい説明が出るものもあります。</li>
           </ul>
         </article>
@@ -379,7 +382,7 @@
       <div class="tsetup asetup" id="asetup">
         <div class="panel tsetup-rules">
           <div class="ts-row"><span class="ts-k">モード</span><div class="ts-v bo-row" id="as-mode">
-            <button type="button" class="bo-btn" data-v="normal" title="自分のキャラで11連戦">ふつう</button><button type="button" class="bo-btn" data-v="ike" title="アイクで全20面">アイクモード</button><button type="button" class="bo-btn" data-v="team" title="3人のチームで11連戦(v1.7.1)">3on3</button></div></div>
+            <button type="button" class="bo-btn" data-v="normal" title="自分のキャラで11連戦">1対1</button><button type="button" class="bo-btn" data-v="ike" title="アイクで全20面">アイクモード</button><button type="button" class="bo-btn" data-v="team" title="3人のチームで11連戦(v1.7.1)">3on3</button></div></div>
           <!-- v1.6.7:スマホでは、モードの説明は「▼」ボタンで下にスライドして開く(PCはいつも表示) -->
           <button type="button" class="as-more" id="as-more" aria-expanded="false" aria-controls="as-explain"><span>モードの説明</span><i aria-hidden="true">▼</i></button>
           <div class="as-explain" id="as-explain"><div class="as-explain-in">
@@ -388,7 +391,11 @@
           </div></div>
         </div>
         <div class="panel tsetup-pick" id="as-pick">
-          <div class="ts-pick-head"><span id="as-picked" class="ts-picked"></span></div>
+          <div class="ts-pick-head"><span id="as-picked" class="ts-picked"></span>
+            <!-- v1.7.5:アーケードの3on3は、残りをランダムで選べる(3on3の準備と同じ) -->
+            <div class="spacer as-team-only"></div>
+            <button type="button" class="btn btn-small as-team-only" id="as-random">残りをランダムで選ぶ</button>
+            <button type="button" class="btn btn-small as-team-only" id="as-clear">選び直す</button></div>
           <ul class="ts-chars" id="as-chars"></ul>
         </div>
         <div class="panel as-detail" id="as-detail"></div>
@@ -408,10 +415,13 @@
           <div class="ts-row"><span class="ts-k">相手</span><div class="ts-v bo-row" id="tt-foe">
             <button type="button" class="bo-btn" data-v="list" title="キャラ一覧から3人(自分のチーム以外)。足りなければ新しく生まれたキャラ">キャラ一覧から</button><button type="button" class="bo-btn" data-v="new" title="ランダムに生まれた、だれも知らないキャラ3人">新しく生まれたキャラ</button><button type="button" class="bo-btn" data-v="2p" title="1台のスマホ・iPadを交代で使って、2人で対戦する">2P対戦</button></div></div>
           <!-- v1.7.3:人数(4on4。モードの名前は3on3のまま)と、対戦中の武器の変更 -->
+          <!-- v1.7.5:3on3ルールの整理案。人数と武器変更は「その他の設定」にしまう(最初は閉じている) -->
+          <details class="tt-moreopts" id="tt-moreopts"><summary>その他の設定<small id="tt-moreopts-now"></small></summary>
           <div class="ts-row"><span class="ts-k">人数</span><div class="ts-v bo-row" id="tt-size">
             <button type="button" class="bo-btn" data-v="3">3on3</button><button type="button" class="bo-btn" data-v="4">4on4</button></div></div>
           <div class="ts-row"><span class="ts-k" title="対戦中の武器の変更">武器変更</span><div class="ts-v bo-row" id="tt-wchange" title="対戦中、選ぶ画面で出すキャラ(ベオク)の武器を変えられる">
             <button type="button" class="bo-btn" data-v="off">OFF</button><button type="button" class="bo-btn" data-v="on">ON</button></div></div>
+          </details>
           <!-- スマホでは、ルールの説明は「▼」ボタンで開く(アーケードと同じ) -->
           <button type="button" class="as-more" id="tt-more" aria-expanded="false" aria-controls="tt-explain"><span>ルールの説明</span><i aria-hidden="true">▼</i></button>
           <div class="as-explain" id="tt-explain"><div class="as-explain-in">
@@ -461,6 +471,8 @@
         <div class="fighter" data-side="right"></div>
         <div class="arena-fx" id="arena-fx" aria-live="polite"></div>
       </div>
+      <!-- v1.7.4:3on3で相手のチームを倒したとき、「次へ」を速度・結果まで飛ばすの上にも出す(下の「次へ」もそのまま) -->
+      <div class="tt-topnext" id="tt-topnext" hidden><button type="button" class="btn btn-main" id="btn-tt-topnext">次へ</button></div>
       <div class="battle-controls">
         <button type="button" class="btn btn-small" id="btn-speed">速度:ふつう</button>
         <button type="button" class="btn btn-small" id="btn-skip">結果まで飛ばす</button>
