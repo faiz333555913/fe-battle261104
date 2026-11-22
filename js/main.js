@@ -36,6 +36,7 @@
     if (name === "arcade") renderArcade();
     if (name === "ttsetup") renderTTSetup(); // v1.7.0
     if (name !== "battle") battle.team = null;
+    $("#tt-topnext").hidden = true; // v1.7.4
     if (name === "howto") $("#screen-howto").scrollTop = 0;
     if (name === "data") renderData(); // v1.6.4
     window.scrollTo(0, 0);
@@ -204,6 +205,7 @@
     updateTourButton();
     updateArcButton();
     updateTTButton();
+    showModeGroup("main");
     titleScreen.dataset.stage = "mode";
     slideIn($(".mode-menu", titleScreen));
     modeBusy = false;
@@ -211,9 +213,28 @@
   async function closeModeMenu() {
     if (modeBusy || titleScreen.dataset.stage !== "mode") return;
     modeBusy = true;
-    await slideOut($$(".mode-menu .btn", titleScreen));
+    await slideOut(modeButtons());
     if (titleScreen.dataset.stage !== "mode") { modeBusy = false; return; }
+    showModeGroup("main");
     enterMenu();
+  }
+  // v1.7.4:モードの中の選択(闘技場 → 1対1 / 3on3、アーケード → 1対1 / 3on3 / アイクモード)。
+  //   同じメニューの中でボタンを入れかえ、タイトルのメニューと同じ動き(引っ込む → 左右から出てくる)で出す
+  const modeButtons = () => $$(".mode-menu .btn", titleScreen).filter((b) => !b.hidden);
+  function showModeGroup(group) {
+    $$(".mode-menu .btn", titleScreen).forEach((b) => { b.hidden = b.dataset.group !== group; });
+    $(".mode-menu", titleScreen).dataset.group = group;
+  }
+  async function switchModeGroup(group) {
+    if (modeBusy || titleScreen.dataset.stage !== "mode") return;
+    modeBusy = true;
+    await slideOut(modeButtons());
+    if (titleScreen.dataset.stage !== "mode") { modeBusy = false; return; }
+    updateTTButton();
+    updateArcSubButtons();
+    showModeGroup(group);
+    slideIn($(".mode-menu", titleScreen));
+    modeBusy = false;
   }
   // トーナメントは、出られるキャラが8人以上いないと選べない(途中のトーナメントがあれば続きから)
   function updateTourButton() {
@@ -229,7 +250,15 @@
     const saved = loadArc();
     // v1.6.1:アイクモードはキャラがいなくても遊べる
     $("#btn-mode-arcade").disabled = false;
-    $("#arc-mode-note").textContent = saved ? (saved.done ? "結果を見る" : `続きから(${A_.isIke(saved) ? "アイク・" : A_.isTeam(saved) ? "3on3・" : ""}${A_.stageName(saved.stage, saved)})`) : n < 1 ? "アイクモードで遊べる" : "1人で連戦を勝ち抜く";
+    $("#arc-mode-note").textContent = saved ? (saved.done ? "結果を見る" : `続きから(${A_.isIke(saved) ? "アイク・" : A_.isTeam(saved) ? "3on3・" : ""}${A_.stageName(saved.stage, saved)})`) : n < 1 ? "アイクモードで遊べる" : "1人もしくは3on3で連戦を勝ち抜く";
+  }
+  // v1.7.4:アーケードの中の 1対1(キャラ1人以上)/ 3on3(3人以上)/ アイクモード(いつでも)
+  function updateArcSubButtons() {
+    const n = S.list().filter((c) => !isBanned(c)).length;
+    $("#btn-arc-normal").disabled = n < 1;
+    $("#arc-normal-note").textContent = n < 1 ? "キャラが1人以上必要" : "1人で11連戦を勝ち抜く";
+    $("#btn-arc-team").disabled = n < A_.TEAM_SIZE;
+    $("#arc-team-note").textContent = n < A_.TEAM_SIZE ? `キャラが3人以上必要(いま${n}人)` : "3人のチームで11連戦を勝ち抜く";
   }
   // v1.7.0:3on3は、出られるキャラが3人以上いないと選べない
   function updateTTButton() {
@@ -244,17 +273,29 @@
     const row = e.target.closest(".fighter-row");
     if (row) row.closest(".fighter").classList.toggle("desc-open");
   });
-  $("#btn-mode-arena").addEventListener("click", () => { if (!modeBusy) { tourMatch = null; goto("prep"); } });
+  // v1.7.4:闘技場 → 1対1 / 3on3 を選ぶ
+  $("#btn-mode-arena").addEventListener("click", () => switchModeGroup("arena"));
+  $("#btn-arena-1v1").addEventListener("click", () => { if (!modeBusy) { tourMatch = null; goto("prep"); } });
+  $("#btn-arena-back").addEventListener("click", () => switchModeGroup("main"));
+  $("#btn-arcsub-back").addEventListener("click", () => switchModeGroup("main"));
   $("#btn-mode-tour").addEventListener("click", () => {
     if (modeBusy) return;
     tourMatch = null;
     goto(loadTour() ? "tour" : "tsetup");
   });
+  // v1.7.4:アーケード → 1対1 / 3on3 / アイクモード を選ぶ(途中のアーケードがあれば、今までどおり続きから)
   $("#btn-mode-arcade").addEventListener("click", () => {
     if (modeBusy) return;
     arcMatch = null;
-    goto(loadArc() ? "arcade" : "asetup");
+    if (loadArc()) goto("arcade");
+    else switchModeGroup("arcade");
   });
+  $$("[data-arc]", titleScreen).forEach((b) => b.addEventListener("click", () => {
+    if (modeBusy || b.disabled) return;
+    arcMatch = null;
+    asetup.mode = b.dataset.arc;
+    goto(loadArc() ? "arcade" : "asetup");
+  }));
   $("#btn-mode-3on3").addEventListener("click", () => { if (!modeBusy) goto("ttsetup"); });
 
   // 画面のどこを押しても始まる
@@ -1645,7 +1686,9 @@
   function ougiBg(kind, side) {
     if (battle.skip || !OUGI_BG[kind]) return;
     const arena = $("#arena");
-    let bg = $(".ougi-bg", arena);
+    // v1.7.5:2回続けて発動したとき、消えかけの背景(.out。0.5秒後に消す予約あり)を使い回していたので、
+    //   2回目の背景がすぐ消えて演出が出なかった。消えかけの背景は使わず、新しく作る
+    let bg = $(".ougi-bg:not(.out)", arena);
     if (!bg) { bg = document.createElement("div"); arena.appendChild(bg); }
     bg.className = `ougi-bg ${kind} ${side}`;
     bg.innerHTML = OUGI_BG[kind]();
@@ -2417,7 +2460,7 @@
     team: [
       "キャラを3人選んで11連戦。敵も毎回3人(ランダムに生まれたキャラ)",
       "3人ともLv1から。1勝でLv+2、Lv21でクラスチェンジ(ふつうと同じ)",
-      "バトルは3on3と同じ(王・休み・継承・神官など)。相手の王を倒せば勝ち",
+      "バトルは3on3と同じ(王・フェイズ・継承・神官など)。相手の王を倒せば勝ち",
       "スキルは最初に1人ずつ2つから選ぶ。勝つと、3人のうち1人だけ交換・追加できる(9体目を倒すと2つ目を追加)",
       "11体目(EXTRA)は、敵の3人の中に必ず赤竜のイナがいる。10体目を倒すと★、EXTRAに勝つと★★(3人とも)",
       "負けてもコンティニューできる(EXTRAは3回まで)",
@@ -2476,12 +2519,15 @@
         ${UI.charIcon(c, "small")}<div class="li-text"><div class="li-name">${UI.esc(c.name)}${UI.genderMark(c)}</div><div class="li-sub">${UI.esc(c.className)}</div></div>${n >= 0 ? `<b class="ts-no">${n + 1}</b>` : ""}</li>`;
     }).join("") : `<li class="empty">バトルに出せるキャラがいません。<button type="button" class="link-btn" data-goto="create">キャラ作成</button>から作ってください。</li>`;
     $("#as-picked").innerHTML = `選んだキャラ <b>${asetup.picks.length}</b> / ${A_.TEAM_SIZE}人`;
+    $("#as-random").disabled = asetup.picks.length >= A_.TEAM_SIZE || chars.length < A_.TEAM_SIZE;
+    $("#as-clear").disabled = !asetup.picks.length;
     const rows = asetup.picks.map((id, i) => {
       const c = S.find(id);
       if (!c) return "";
       const st = A_.create(c, { mode: "normal", rng: global.Rng.createSeededRng("asetup") });
       const me = { ...A_.playerChar(st, c), arcadeLv: 1 };
-      return `<div class="tt-arc-member"><b class="ts-no">${i + 1}</b>${UI.fighterHeader(me, { element: true })}</div>`;
+      // v1.7.4:能力値(アーケードの始まりの Lv1)と武器も出す
+      return `<div class="tt-arc-member"><b class="ts-no">${i + 1}</b><div class="tt-slot-body">${UI.fighterHeader(me, { element: true })}${ttStatsHtml(me, me.stats, me.weapons)}</div></div>`;
     }).join("");
     $("#as-detail").innerHTML = `<div class="side-top"><p class="side-label">自分のチーム<small>アーケードの始まり(Lv1)</small></p></div>
       <div class="tt-arc-team">${rows || '<p class="muted as-detail-empty">キャラを3人選ぶと、ここに出ます</p>'}</div>`;
@@ -2509,6 +2555,13 @@
     $("#asetup").classList.toggle("explain-open", open);
     $("#as-more").setAttribute("aria-expanded", open ? "true" : "false");
   });
+  // v1.7.5:アーケードの3on3:残りをランダムで選ぶ・選び直す(3on3の準備と同じ)
+  $("#as-random").addEventListener("click", () => {
+    const rest = eligibleChars().filter((c) => !asetup.picks.includes(c.id));
+    while (asetup.picks.length < A_.TEAM_SIZE && rest.length) asetup.picks.push(rest.splice(battleRng.int(0, rest.length - 1), 1)[0].id);
+    renderArcSetup();
+  });
+  $("#as-clear").addEventListener("click", () => { asetup.picks = []; renderArcSetup(); });
   $("#as-mode").addEventListener("click", (e) => { const b = e.target.closest(".bo-btn"); if (b) { asetup.mode = b.dataset.v; renderArcSetup(); } });
   $("#as-detail").addEventListener("change", (e) => {
     if (!e.target.classList.contains("as-form")) return;
@@ -2747,7 +2800,7 @@
     const mine = st.members.map((m, k) => {
       const c = A_.playerChar(m, saved[k]);
       const w = c.weapons.includes(m.weapon) ? m.weapon : c.weapons[0];
-      const opts = c.weapons.map((id) => { const x = UI.charWeapon(c, id); return x ? `<option value="${UI.esc(id)}" ${id === w ? "selected" : ""}>${UI.esc(x.name)}(威力${x.might}・命中${x.hit}・必殺${x.crit})</option>` : ""; }).join("");
+      const opts = c.weapons.map((id) => { const x = UI.charWeapon(c, id); return x ? `<option value="${UI.esc(id)}" ${id === w ? "selected" : ""}>${UI.esc(x.name)}(威力${x.might}・命中${x.hit}・必殺${x.crit}・重さ${x.weight})</option>` : ""; }).join("");
       return `<div class="tn-fighter">${UI.charIcon(c)}<div class="tn-text"><div class="tn-name">${UI.esc(c.name)}${UI.genderMark(c)}</div>
         <div class="tn-sub">${UI.elementBadge(c.element)} ${UI.esc(c.className)} ・ Lv${m.level}</div><div class="tn-skill">${chips(m.skills) || '<span class="muted">スキルなし</span>'}</div>
         <select class="tt-weapon tt-arc-weapon" data-k="${k}" ${c.weapons.length < 2 ? "disabled" : ""} aria-label="${UI.esc(c.name)}の武器">${opts}</select></div></div>`;
@@ -2909,6 +2962,15 @@
     if (arcPlaying) return;
     arcPlaying = true;
     const saved = arcSaved();
+    // v1.7.4:3on3は、3人分のレベルアップ・クラスチェンジをまとめて1回で見せる
+    if (arcState && A_.isTeam(arcState)) {
+      const n = arcState.pending.findIndex((p) => ["skill", "item", "boost", "dope"].includes(p.type));
+      const steps = arcState.pending.slice(0, n < 0 ? arcState.pending.length : n);
+      if (steps.length) {
+        await levelTeamStep(steps, arcTeamSaved(arcState));
+        if (arcState) { arcState.pending.splice(0, steps.length); saveArc(); }
+      }
+    }
     while (arcState && arcState.pending.length && !["skill", "item", "boost", "dope"].includes(arcState.pending[0].type)) {
       const step = arcState.pending[0];
       // v1.7.1:3on3は、だれのレベルアップか(who)
@@ -2919,6 +2981,64 @@
     }
     arcPlaying = false;
     if ($("#screen-arcade").classList.contains("active")) renderArcade();
+  }
+  // v1.7.4:3on3のレベルアップ。3人分の上がった数値を1回で見せる(1人ずつのレベルアップを合わせた分。クラスチェンジもいっしょに)
+  function levelTeamStep(steps, chars) {
+    return new Promise((resolve) => {
+      const ov = $("#levelup");
+      const run = ++luRun;
+      let skip = reduceMotion();
+      let wake = null;
+      const wait = async (ms) => {
+        if (!skip) await new Promise((r) => { wake = r; setTimeout(r, ms); });
+        return run === luRun;
+      };
+      const who = [...new Set(steps.map((s) => s.who))].filter((k) => k != null);
+      const cols = who.map((k) => {
+        const mine = steps.filter((s) => s.who === k);
+        const first = mine[0], last = mine[mine.length - 1];
+        const gains = {};
+        for (const key of DB.STAT_KEYS) gains[key] = mine.reduce((a, s) => a + (s.gains[key] || 0), 0);
+        const cc = mine.find((s) => s.type === "classchange");
+        const c = chars[k] || {};
+        return { k, name: c.name || "", laguz: c.race === "ラグズ", cc, from: first.type === "classchange" ? first.from : first.from, to: last.to, before: first.before, after: last.after, gains,
+          cls: cc ? `${cc.fromClass} → ${cc.toClass}` : `${first.className || ""}${c.race === "ラグズ" ? "(化身前)" : ""}` };
+      });
+      const anyCc = cols.some((c) => c.cc);
+      $(".lu-banner", ov).textContent = anyCc ? "CLASS CHANGE!" : "LEVEL UP!";
+      $("#lu-name").textContent = `${cols.length}人`;
+      $("#lu-class").textContent = "まとめてレベルアップ";
+      $("#lu-lv").textContent = "";
+      ov.classList.add("lu-team-mode");
+      $("#lu-stats").innerHTML = `<div class="lu-team">${cols.map((c) => `<div class="lu-col" data-k="${c.k}">
+        <p class="lu-col-name">${UI.esc(c.name)}</p><p class="lu-col-class">${UI.esc(c.cls)}</p><p class="lu-col-lv">Lv <b>${c.from}</b> → <b class="lu-col-to">${c.cc && c.to === 1 ? "1" : c.to}</b></p>
+        ${DB.STAT_KEYS.map((key) => `<div class="lu-stat" data-k="${key}"><span class="k">${DB.STAT_LABELS[key]}</span><span class="v">${c.before[key]}</span><span class="up">${c.gains[key] > 0 ? "+" + c.gains[key] : ""}</span></div>`).join("")}</div>`).join("")}</div>`;
+      $("#lu-hint").textContent = "タップで飛ばす";
+      ov.dataset.done = "0";
+      ov.hidden = false;
+      const close = () => { ov.hidden = true; ov.classList.remove("lu-team-mode"); luRun++; resolve(); };
+      ov.onclick = () => {
+        if (ov.dataset.done === "1") close();
+        else { skip = true; if (wake) wake(); }
+      };
+      (async () => {
+        if (!(await wait(450))) return;
+        // 能力値は、3人とも同じ行を同時に上げる(HP → 力 → …)
+        for (const key of DB.STAT_KEYS) {
+          let any = false;
+          for (const c of cols) {
+            if (!(c.gains[key] > 0)) continue;
+            const row = $(`.lu-col[data-k="${c.k}"] .lu-stat[data-k="${key}"]`, ov);
+            $(".v", row).textContent = c.after[key];
+            row.classList.add("got");
+            any = true;
+          }
+          if (any && !(await wait(260))) return;
+        }
+        ov.dataset.done = "1";
+        $("#lu-hint").textContent = "タップで次へ";
+      })();
+    });
   }
   function levelStep(step, char) {
     return new Promise((resolve) => {
@@ -3363,21 +3483,31 @@
   const ttVs = () => ttsetup.foe === "2p";
   // v1.7.1:王・休み・スキルの公開・継承・恐怖・神官を追加
   // v1.7.3:人数・休み・王のHP・2P対戦・武器の変更
+  // v1.7.5:3on3ルールの整理案(ガトー承認)。「王を倒せば勝ち」「フェイズ」「控えも時間は進む」を柱に、短い文で。
+  //   細かいことは後ろの「くわしく」の行(tt-rule-more)に
   function ttRules() {
     const n = ttsetup.size;
     return [
       ttVs() ? `1Pと2Pが、キャラ一覧から${n}人ずつと、それぞれの武器を選ぶ(1台を交代で使う。同じキャラを選んでもよい)` : `キャラ一覧から${n}人と、それぞれの武器を選ぶ。相手はコンピューターの${n}人`,
-      `スキルは対戦の前に、${n * 2}人ともランダムで1つずつ決まる(援軍は出ない)`,
-      `${n}人のうち1人がランダムで王になる(HP+${TB.KING.hp}・体格以外の能力値+${TB.KING.stats}。HPは職業の上限まで)。王が倒れたらそのチームの負け。相手の王は分からない`,
-      `ラウンドごとに出すキャラを選んで「決定」。相手も同時に選ぶ。2ラウンド続けて出たキャラは、次の1ラウンド休み`,
-      "選ぶ画面に、そのラウンドの先攻・後攻が出る(先攻の武器・『待ち伏せ』のキャラが出ると変わる)",
-      "名前・職業・属性・バイオリズム(⤴好調 →普通 ⤵不調)は最初から分かる。出てきた相手は武器・HP・スキルが分かり、一度戦った相手は戦闘予測も見られる",
-      "最後の1人になったら、直前に倒れたキャラのスキルと属性を受け継ぐ(属性は2つになり、補正も2つ分)",
-      "『恐怖』はチームのだれかが持っていれば相手の全員に効く。神官がいると、ラウンドの終わりにほかのキャラのHPが15%回復(選ぶ画面で回復の演出)",
-      ttsetup.wchange ? "対戦中の武器の変更:ON。選ぶ画面で、出すキャラ(ベオク)の武器を変えられる" : "対戦中の武器の変更:OFF(準備で選んだ武器のまま)",
-      "HP・化身ゲージ・状態異常はキャラごとに続く。控えのキャラも化身ゲージやスキルが見えないところで進む(エリートは、はじめて出たときにクラスチェンジ)",
-      "相手の王を倒せば勝ち(60ラウンドで決着がつかないときなどは、残りHPの割合で判定)",
+      `勝ち方:${n}人のうち1人が「王」(少し強い)。相手の王を倒したら勝ち、自分の王が倒れたら負け。相手の王がだれかは、終わるまで分からない`,
+      "出し方:ラウンドごとに1人を選んで「決定」。相手も同時に選ぶ。一度戦ったキャラは、全員が戦い終わるまで出せない(フェイズ)。出せるのが1人なら、選ばずにそのまま戦う",
+      "続くもの:HP・状態異常・下がった能力は、控えに戻ってもそのまま。化身ゲージや回復は、控えでも時間どおり進む",
+      "見えるもの:相手の名前・職業・属性・調子(⤴→⤵)は最初から。武器・HP・スキル・補正・戦闘予測は、一度出てきたら。能力値と王は終わるまで秘密",
+      "逆転:王がひとりになると、1人目に倒れた仲間の属性と、2人目に倒れた仲間の属性とスキルを受け継ぐ。神官がいると、フェイズが変わるたびに仲間のHPが15%回復",
+      `${TB.MAX_ROUNDS}ラウンドで決着しないときは、チームの残りHPの割合で判定`,
+      { more: true, text: `くわしく:王はHP+${TB.KING.hp}(職業の上限まで)・体格以外+${TB.KING.stats}。スキルは対戦の前に全員ランダムで1つずつ(援軍も出る。援軍は倒れるまで代わりに戦う)。『恐怖』はチームのだれかが持てば相手の全員に。ポイズン・燃焼は3on3では4ラウンド(出たラウンドで数える)。先攻・後攻は選ぶ画面に出る。『エリート』は、はじめて出たときにクラスチェンジ。先に全員が戦ったチームは、生きているだれでも出せる` },
+      { more: true, text: ttsetup.wchange ? "その他の設定:対戦中の武器の変更 ON(選ぶ画面で、出すキャラ(ベオク)の武器を変えられる)" : `その他の設定:人数(3on3/4on4)・対戦中の武器の変更(いまはOFF)` },
     ];
+  }
+  // v1.7.4:3on3でキャラを選ぶとき、能力値と武器が見えるように(ガトー指示:「ステータスが見れないと選出しずらい」)
+  //   能力値は1行(ラグズは化身後。化身前は title に)。武器は選んだ武器の数値と効果(アーケードは持っている武器ぜんぶ)
+  function ttStatsHtml(c, stats, weaponIds) {
+    const s = stats || c.stats;
+    const lz = c.race === "ラグズ" && c.statsHuman;
+    const cells = DB.STAT_KEYS.map((k) => `<span>${DB.STAT_LABELS[k]}<b>${s[k]}</b></span>`).join("") + `<span>体格<b>${c.stats.con}</b></span>`;
+    const human = lz ? DB.STAT_KEYS.map((k) => `${DB.STAT_LABELS[k]}${c.statsHuman[k]}`).join(" ") : "";
+    const ws = (weaponIds || []).map((id) => UI.charWeapon(c, id)).filter(Boolean).map((w) => `<div class="weapon-line tt-wline">${UI.weaponLine(w)}</div>`).join("");
+    return `<div class="tt-stats"${lz ? ` title="化身前:${UI.esc(human)}"` : ""}>${lz ? "<em>化身後</em>" : ""}${cells}</div>${ws}`;
   }
   function renderTTSetup() {
     const chars = eligibleChars();
@@ -3387,6 +3517,8 @@
     $$("#tt-foe .bo-btn").forEach((b) => b.classList.toggle("on", b.dataset.v === ttsetup.foe));
     $$("#tt-size .bo-btn").forEach((b) => b.classList.toggle("on", Number(b.dataset.v) === N));
     $$("#tt-wchange .bo-btn").forEach((b) => b.classList.toggle("on", (b.dataset.v === "on") === ttsetup.wchange));
+    // v1.7.5:「その他の設定」(人数・武器変更)は閉じていても、いまの設定が見出しに出る
+    $("#tt-moreopts-now").textContent = `${N}on${N} ・ 武器変更${ttsetup.wchange ? "ON" : "OFF"}`;
     // 2Pがチームを選んでいる間は、設定を変えない(1Pの選んだ人数のまま)
     $$("#tt-foe .bo-btn, #tt-size .bo-btn, #tt-wchange .bo-btn").forEach((b) => { b.disabled = ttsetup.stage === 2; });
     const others = chars.length - ttsetup.picks.length;
@@ -3395,7 +3527,7 @@
       : ttsetup.foe === "new"
         ? `相手は、ランダムに生まれた${N}人です(キャラ一覧には入りません)。`
         : `相手は、キャラ一覧から自分のチーム以外の${N}人をランダムに選びます。${others < N && ttsetup.picks.length === N ? "足りない分は、新しく生まれたキャラです。" : ""}`;
-    $("#tt-rules").innerHTML = ttRules().map((t) => `<li>${UI.esc(t)}</li>`).join("");
+    $("#tt-rules").innerHTML = ttRules().map((t) => (typeof t === "string" ? `<li>${UI.esc(t)}</li>` : `<li class="tt-rule-more">${UI.esc(t.text)}</li>`)).join("");
     $("#tt-chars").innerHTML = chars.map((c) => {
       const n = ttsetup.picks.indexOf(c.id);
       return `<li data-id="${UI.esc(c.id)}" class="${n >= 0 ? "picked" : ""}" tabindex="0" role="checkbox" aria-checked="${n >= 0}">
@@ -3407,9 +3539,9 @@
       const c = ttsetup.picks[i] && S.find(ttsetup.picks[i]);
       if (!c) return `<div class="tt-slot empty"><b class="ts-no">${i + 1}</b><span class="muted">キャラを選んでください</span></div>`;
       const w = c.weapons.includes(ttsetup.weapons[c.id]) ? ttsetup.weapons[c.id] : c.weapons[0];
-      const opts = c.weapons.map((id) => { const x = UI.charWeapon(c, id); return x ? `<option value="${UI.esc(id)}" ${id === w ? "selected" : ""}>${UI.esc(x.name)}(威力${x.might}・命中${x.hit}・必殺${x.crit})</option>` : ""; }).join("");
-      return `<div class="tt-slot"><b class="ts-no">${i + 1}</b>${UI.charIcon(c, "small")}<div class="tt-slot-body"><div class="li-name">${UI.esc(c.name)}${UI.genderMark(c)}<small>${UI.esc(c.className)}</small></div>
-        <select class="tt-weapon" data-id="${UI.esc(c.id)}" ${c.weapons.length < 2 ? "disabled" : ""} aria-label="${UI.esc(c.name)}の武器">${opts}</select></div></div>`;
+      const opts = c.weapons.map((id) => { const x = UI.charWeapon(c, id); return x ? `<option value="${UI.esc(id)}" ${id === w ? "selected" : ""}>${UI.esc(x.name)}(威力${x.might}・命中${x.hit}・必殺${x.crit}・重さ${x.weight})</option>` : ""; }).join("");
+      return `<div class="tt-slot"><b class="ts-no">${i + 1}</b>${UI.charIcon(c, "small")}<div class="tt-slot-body"><div class="li-name">${UI.esc(c.name)}${UI.genderMark(c)}<small>${UI.esc(c.className)}</small>${UI.elementBadge ? UI.elementBadge(c.element) : ""}</div>
+        <select class="tt-weapon" data-id="${UI.esc(c.id)}" ${c.weapons.length < 2 ? "disabled" : ""} aria-label="${UI.esc(c.name)}の武器">${opts}</select>${ttStatsHtml(c, null, [w])}</div></div>`;
     }).join("");
     const ok = ttsetup.picks.length === N;
     $("#tt-start").disabled = !ok;
@@ -3434,7 +3566,7 @@
   $("#tt-foe").addEventListener("click", (e) => { const b = e.target.closest(".bo-btn"); if (b && !b.disabled) { ttsetup.foe = b.dataset.v; saveTTOpts(); renderTTSetup(); } });
   $("#tt-size").addEventListener("click", (e) => { const b = e.target.closest(".bo-btn"); if (b && !b.disabled) { ttsetup.size = Number(b.dataset.v); saveTTOpts(); renderTTSetup(); } });
   $("#tt-wchange").addEventListener("click", (e) => { const b = e.target.closest(".bo-btn"); if (b && !b.disabled) { ttsetup.wchange = b.dataset.v === "on"; saveTTOpts(); renderTTSetup(); } });
-  $("#tt-team").addEventListener("change", (e) => { if (e.target.classList.contains("tt-weapon")) ttsetup.weapons[e.target.dataset.id] = e.target.value; });
+  $("#tt-team").addEventListener("change", (e) => { if (e.target.classList.contains("tt-weapon")) { ttsetup.weapons[e.target.dataset.id] = e.target.value; renderTTSetup(); } });
   $("#tt-random").addEventListener("click", () => {
     const rest = eligibleChars().filter((c) => !ttsetup.picks.includes(c.id));
     while (ttsetup.picks.length < ttsetup.size && rest.length) ttsetup.picks.push(rest.splice(battleRng.int(0, rest.length - 1), 1)[0].id);
@@ -3507,21 +3639,21 @@
     $("#tt-strip").innerHTML = `<div class="tt-side" data-side="left"><small>1P</small>${html("left")}</div><div class="tt-side" data-side="right">${html("right")}<small>${ttSideName(st, "right")}</small></div>`;
   }
   // 選ぶ画面のカード。v1.7.1:属性・職業は最初から見える(相手のまだ出ていないキャラも)。
-  //   自分のキャラは選ぶ(決定ボタンで決まる)、相手のキャラは選ぶと戦闘予測が出る。休みのキャラは「休み」
-  // v1.7.3:相手の名前も最初から見える。続けて出ているキャラは「連続」(もう一度出ると次は休み)。回復したキャラは回復の演出
+  //   自分のキャラは選ぶ(決定ボタンで決まる)、相手のキャラは選ぶと戦闘予測が出る
+  // v1.7.3:相手の名前も最初から見える。回復したキャラは回復の演出(v1.7.4:休み → フェイズの「出撃済み」)
   let ttSel = { left: null, right: null };
   let ttHealLive = false;
   function ttCardHtml(st, side, i, pickable) {
     const u = st.team[side][i];
     const dead = u.hp <= 0;
     const mine = side === ttView;
-    const rest = pickable && !dead && TB.resting(st, side) === i;
+    // v1.7.4:フェイズ。このフェイズにもう戦ったキャラは「出撃済み」(相手のキャラも)
+    const rest = pickable && !dead && TB.isUsed(st, side, i);
     const sel = pickable && ttSel[side] === i;
     // v1.7.2:受け継いだ属性は2つ並べる。バイオリズムは全員に矢印で(⤴好調・→普通・⤵不調)
     const elem = UI.elementBadges(u.char);
     const bio = UI.bioArrow(u.bio);
-    const restTag = rest ? '<span class="tt-rest" title="2ラウンド続けて出たので、このラウンドは出られない">休み</span>'
-      : pickable && !dead && TB.restNext(st, side, i) ? '<span class="tt-rest tt-chain" title="前のラウンドに出た。このラウンドも出ると、次のラウンドは休み">連戦中</span>' : "";
+    const restTag = rest ? '<span class="tt-rest" title="このフェイズはもう戦った。お互いの全員が戦うと次のフェイズで、また出せる">出撃済み</span>' : "";
     const attrs = pickable ? ` type="button" data-side="${side}" data-i="${i}"${dead || (mine && rest) ? " disabled" : ""} aria-pressed="${sel}"` : "";
     const tag = pickable ? "button" : "div";
     if (!ttKnown(st, side, i)) {
@@ -3532,6 +3664,9 @@
     const skill = mine || st.skillSeen[side][i] ? (names.map((n) => UI.skillChip(n, false)).join("") || '<span class="muted">スキルなし</span>') : hiddenSkillChip;
     const gauge = u.laguz ? `<span class="tt-gauge${u.laguz.transformed ? " on" : ""}">${u.laguz.transformed ? "化身中" : "化身前"} ${u.laguz.gauge}</span>` : "";
     const stat = ttStatus(u) ? `<span class="tt-st">${UI.esc(ttStatus(u))}</span>` : "";
+    // v1.7.4:援軍が残っていれば、次に出たときも援軍が戦う
+    const al = u.allyState && u.allyState.hp > 0 ? u.allyState : null;
+    const ally = al && !dead ? `<span class="tt-ally" title="次に出たときも、援軍が代わりに戦う">援軍 ${UI.esc(al.className)} HP${al.hp}/${al.maxHp}</span>` : "";
     // v1.7.3:前のラウンドの終わり(神官・回復スキル)に回復したキャラは、HPのバーが伸びる演出(ttHealAnimate)
     const hl = ttHealLive && !dead && battle.ttHeal && battle.ttHeal[side] && battle.ttHeal[side][i];
     const pct = ttPct(u);
@@ -3539,7 +3674,7 @@
     const healPop = hl ? `<span class="tt-heal-pop" aria-label="HP${hl.amount}回復"><small>${UI.esc(hl.src)}</small>+${hl.amount}</span>` : "";
     const inner = `${UI.charIcon(u.char, "small", { noWeapon: true })}<div class="tt-c-body"><b>${ttKingTag(st, side, i)}${UI.esc(u.name)}${bio}</b><small>${elem}${UI.esc(u.className)} ・ ${UI.esc(ttWeaponName(st, side, i))}</small>
       <span class="tt-hp"><span class="tt-hpbar"><i style="width:${from}%"${hl ? ` data-to="${pct}"` : ""}></i></span><em>${Math.max(0, u.hp)}/${u.maxHp}</em></span>
-      <span class="tt-c-skill">${skill}${gauge}${stat}</span>${mine && !dead ? ttBonusHtml(u) : ""}</div>${dead ? '<span class="tt-ko">撃破</span>' : restTag}${healPop}`;
+      <span class="tt-c-skill">${skill}${gauge}${stat}${ally}</span>${!dead ? ttBonusHtml(u, mine) : ""}</div>${dead ? '<span class="tt-ko">撃破</span>' : restTag}${healPop}`;
     const cls = `tt-card${dead ? " dead" : ""}${st.active[side] === i ? " last" : ""}${sel ? " sel" : ""}${rest ? " rest" : ""}${hl ? " tt-healed" : ""}`;
     return `<${tag} class="${cls}"${attrs}>${inner}</${tag}>`;
   }
@@ -3551,21 +3686,31 @@
   }
   // v1.7.2:自分のキャラに付いている補正(属性・バイオリズム・武器・兵種・下がった能力・受け継いだ属性)。
   //   相手によって変わる分(3すくみ・属性の不利・相手のスキル)は入れない。±0以外だけ
-  function ttBonusHtml(u) {
+  // v1.7.5:相手のキャラ(出てきたキャラ)にも出す。王の分は、自分のキャラだけ足す(相手の王は分からないので入れない)
+  //   王:体格以外+s → 攻撃+s・防御+s・命中+3s(技×2+幸運)・回避+3s(速さ×2+幸運)・必殺(技÷2の増えた分)
+  function ttKingBonus(u) {
+    const s = TB.KING.stats, skl = u.stats.skl;
+    return { attack: s, defense: s, hit: s * 3, avoid: s * 3, crit: Math.floor(skl / 2) - Math.floor((skl - s) / 2) };
+  }
+  function ttBonusHtml(u, mine = true) {
     // 比べる相手:同じ武器・属性なし・スキルなし(鳴動は相手の体格しだいなので入れない)
-    const plain = { ...u, char: { ...u.char, element: null, element2: null }, skill: null, extraSkills: [], weapon: { ...u.weapon, weaponSkill: null }, teamFear: false,
+    const plain = { ...u, char: { ...u.char, element: null, element2: null, element3: null, element4: null }, skill: null, extraSkills: [], weapon: { ...u.weapon, weaponSkill: null }, teamFear: false,
       laguz: null, stats: { ...u.stats, con: 999 }, debuff: {}, buff: {} };
-    const b = B.bonusSummary(u, plain);
+    const b = { ...B.bonusSummary(u, plain) };
+    const king = mine && u.king;
+    if (king) { const k = ttKingBonus(u); for (const key of Object.keys(k)) b[key] = (b[key] || 0) + k[key]; }
     const parts = [["攻撃", b.attack], ["防御", b.defense], ["命中", b.hit], ["回避", b.avoid], ["必殺", b.crit]].filter(([, v]) => v);
     const body = parts.map(([k, v]) => `<span class="${v > 0 ? "up" : "down"}">${k}<b>${UI.bonusText(v)}</b></span>`).join("") || '<span class="muted">なし</span>';
-    return `<span class="tt-bonus" title="自分に付いている補正(属性・バイオリズム・武器など。3すくみ・相手のスキルは入らない)"><em>補正</em>${body}</span>`;
+    const title = mine ? `付いている補正(属性・バイオリズム・武器など${king ? "・王" : ""}。3すくみ・相手のスキルは入らない)` : "相手に付いている補正(属性・バイオリズム・武器など。王の分は入らない。3すくみ・こちらのスキルは入らない)";
+    return `<span class="tt-bonus" title="${title}"><em>補正</em>${body}</span>`;
   }
   // v1.7.3:このラウンドの先攻・後攻(選ぶ人から見て)。選んだ2人に先攻の武器・待ち伏せがあると変わる
   function ttOrderHtml(st) {
     const me = ttView, foe = me === "left" ? "right" : "left";
     const base = TB.nextFirst(st);
     const word = (side) => (side === me ? "あなたのチームが先攻" : "相手が先攻");
-    let html = `<span class="tt-order-tag ${base.side === me ? "first" : "second"}">${base.side === me ? "先攻" : "後攻"}</span>ROUND ${st.round + 1}は<b>${word(base.side)}</b>`;
+    // v1.7.4:いまのフェイズ(お互いの全員が戦うと次のフェイズ)
+    let html = `<span class="tt-phase" title="1度戦ったキャラは、お互いの全員が戦うまで出せない">PHASE ${st.phase || 1}</span><span class="tt-order-tag ${base.side === me ? "first" : "second"}">${base.side === me ? "先攻" : "後攻"}</span>ROUND ${st.round + 1}は<b>${word(base.side)}</b>`;
     if (ttSel[me] != null && ttSel[foe] != null) {
       const p = TB.nextFirst(st, { [me]: ttSel[me], [foe]: ttSel[foe] });
       if (p.random) html += `<small>(この組み合わせは、両方に先攻の効果があるのでランダム)</small>`;
@@ -3580,7 +3725,8 @@
     const l = ttSel[me], r = ttSel[foe];
     if (l == null || r == null) return `<p class="tt-fc-empty">${l == null ? "出すキャラを選んでください。" : ""}一度戦った相手のキャラを選ぶと、戦闘予測が出ます</p>`;
     if (!ttKnown(st, foe, r)) return `<p class="tt-fc-empty">まだ戦っていない相手の戦闘予測は見えません</p>`;
-    const L = st.team[me][l], R = st.team[foe][r];
+    // v1.7.4:援軍が残っていれば、戦うのは援軍
+    const L = TB.fighterOf(st.team[me][l]), R = TB.fighterOf(st.team[foe][r]);
     const f = B.forecast(L, R);
     const form = (u) => (u.laguz ? `<span class="tt-gauge${u.laguz.transformed ? " on" : ""}">${u.laguz.transformed ? "化身中" : "化身前"}</span>` : "");
     const side = (u, c, name, hp) => `<div class="tt-fc-side"><p class="tt-fc-name"><b>${name}</b><small>HP ${hp}</small>${form(u)}</p><div class="mini-fc">${miniFcHtml(c)}</div></div>`;
@@ -3593,7 +3739,7 @@
     const u = st.team[me][i];
     if (u.laguz || u.char.weapons.length < 2) return `<p class="tt-wc-note muted">${u.laguz ? "ラグズは武器を変えられません" : "武器は1つだけです"}</p>`;
     const cur = u.equip ? u.equip.id : u.weapon.id;
-    const opts = u.char.weapons.map((id) => { const x = UI.charWeapon(u.char, id); return x ? `<option value="${UI.esc(id)}" ${id === cur ? "selected" : ""}>${UI.esc(x.name)}(威力${x.might}・命中${x.hit}・必殺${x.crit})</option>` : ""; }).join("");
+    const opts = u.char.weapons.map((id) => { const x = UI.charWeapon(u.char, id); return x ? `<option value="${UI.esc(id)}" ${id === cur ? "selected" : ""}>${UI.esc(x.name)}(威力${x.might}・命中${x.hit}・必殺${x.crit}・重さ${x.weight})</option>` : ""; }).join("");
     return `<label class="tt-wc"><span>${UI.esc(u.name)}の武器</span><select id="tt-wc-select" class="tt-weapon" aria-label="${UI.esc(u.name)}の武器を変える">${opts}</select>${u.broken ? '<small class="tt-st">壊れている</small>' : ""}</label>`;
   }
   function ttRenderPick(st, title, sub, pickable = true) {
@@ -3626,12 +3772,21 @@
   function ttMyPick(st, token, side = "left") {
     const mine = TB.allowed(st, side);
     if (battle.skip) return Promise.resolve(ttAutoPick(st, side));
-    if (mine.length === 1 && !st.versus && !(battle.ttHeal && ttHealVisible(st, side))) return Promise.resolve(mine[0]);
+    // v1.7.5:出せるキャラが1人だけなら、選ぶ画面を出さずにそのまま戦う(2P対戦・回復の演出があるときも)
+    if (mine.length === 1) return Promise.resolve(mine[0]);
     ttView = side;
+    // v1.7.4:最初から自分のキャラ(出せるいちばん左)と相手のキャラにカーソルを合わせ、戦闘予測も出しておく。
+    //   相手は、戦闘予測が見られる(一度出てきた)・このフェイズに出てこられる いちばん左のキャラ。いなければ、いちばん左の倒れていないキャラ
+    const foeSide = side === "left" ? "right" : "left";
+    const foeAlive = st.team[foeSide].map((u, i) => i).filter((i) => st.team[foeSide][i].hp > 0);
+    const foeOk = TB.allowed(st, foeSide);
+    const foeSeen = foeAlive.filter((i) => ttKnown(st, foeSide, i, side));
+    const foeFirst = foeSeen.find((i) => foeOk.includes(i)) ?? foeSeen[0] ?? foeOk[0] ?? foeAlive[0];
     ttSel = { left: null, right: null };
-    if (mine.length === 1) ttSel[side] = mine[0];
+    ttSel[side] = mine[0];
+    ttSel[foeSide] = foeFirst == null ? null : foeFirst;
     const who = st.versus ? `${ttSideName(st, side)}が` : "";
-    const sub = st.round ? "相手も同時に選びます。2ラウンド続けて出たキャラは休み。一度戦った相手を選ぶと戦闘予測" : "相手も同時に選びます。戦闘予測は、一度戦った相手だけ見られます";
+    const sub = st.round ? "相手も同時に選びます。戦ったキャラは、お互いの全員が戦うまで出撃済み(フェイズ)。一度戦った相手を選ぶと戦闘予測" : "相手も同時に選びます。戦闘予測は、一度戦った相手だけ見られます";
     const render = () => ttRenderPick(st, `ROUND ${st.round + 1} ・ ${who}出すキャラを選ぶ`, sub);
     ttHealLive = true; // 回復の演出は、選ぶ画面を開いたときの1回だけ(カードを選んで描き直すときは出さない)
     render();
@@ -3645,12 +3800,6 @@
       ttPickResolve = (i) => { ttPickResolve = null; ttPickRender = null; $("#tt-pick").hidden = true; resolve(token === battle.token ? i : null); };
       ttPickRender = render;
     });
-  }
-  // 回復の演出が、この人に見えるか(相手のまだ出ていないキャラの回復は見えない)
-  function ttHealVisible(st, view) {
-    const h = battle.ttHeal;
-    if (!h) return false;
-    return ["left", "right"].some((side) => (h[side] || []).some((x, i) => x && ttKnown(st, side, i, view)));
   }
   // おまかせ(コンピューターと同じ選び方)。武器の変更がONなら、武器もコンピューターが選ぶ
   function ttAutoPick(st, side) {
@@ -3736,6 +3885,7 @@
   // ラウンドの前の2人を画面に出す
   function ttShowFighters(L, R) {
     battle.L = L; battle.R = R;
+    battle.owner = {}; // v1.7.4:前のラウンドの援軍の記録は使わない
     renderFighters(B.forecast(L, R));
     for (const [side, u] of [["left", L], ["right", R]]) {
       $(".hp-max", fighterEl(side)).textContent = u.maxHp;
@@ -3750,13 +3900,20 @@
   }
   // v1.7.3:ラウンドのあいだに回復した分(控えの回復スキル・空の祝福、ラウンドの終わりの神官)。選ぶ画面で演出する
   //   hp0:ラウンドの前のHP・最大HP / shown:戦いの画面で最後に見せたHP(戦った2人)
+  // v1.7.5:そのラウンドを援軍が戦ったまま終わったか(援軍が来て、自分に戻らなかった)
+  function allyEnded(events, side) {
+    const sw = events.filter((e) => e.type === "swap" && e.actor === side);
+    return sw.length > 0 && !sw[sw.length - 1].back;
+  }
   function ttHealsOf(st, hp0, picks, shown, res) {
     const out = { left: [], right: [] };
     let any = false;
     for (const side of ["left", "right"]) {
       st.team[side].forEach((u, i) => {
         if (u.hp <= 0) return;
-        const fought = picks[side] === i;
+        // v1.7.5:援軍が戦ったまま終わったときは、戦いの画面で最後に見せたHPは援軍のもの。呼んだキャラは控えと同じく、ラウンドの前のHPと比べる
+        //   (前は援軍のHPと比べていたので、呼んだキャラが回復したように見えていた)
+        const fought = picks[side] === i && !allyEnded(res.events, side);
         const was = fought ? shown[side] : hp0[side][i];
         const grow = u.maxHp - (fought ? shown.max[side] : hp0.max[side][i]); // 大器晩成などで最大HPが増えた分は回復に入れない
         const amount = u.hp - was - Math.max(0, grow);
@@ -3803,6 +3960,7 @@
     const token = battle.token;
     $("#battle-log").innerHTML = "";
     $("#battle-result").hidden = true;
+    $("#tt-topnext").hidden = true; // v1.7.4
     $("#btn-skip").disabled = false;
     $("#set-score").hidden = true;
     $("#round-label").textContent = "";
@@ -3810,6 +3968,7 @@
     for (const side of ["left", "right"]) { const el = fighterEl(side); el.className = "fighter tt-empty"; el.innerHTML = '<p class="tt-wait">？</p>'; }
     $("#tt-strip").hidden = false;
     ttRenderStrip(st);
+    logLine({ type: "match" }, "━━ PHASE 1 ━━");
     if (st.versus) logLine({ type: "match" }, `2P対戦(${st.team.left.length}on${st.team.right.length})。王はそれぞれの選ぶ画面で分かる。王が倒れたら負け`);
     else {
       const k = st.team.left[st.king.left];
@@ -3821,13 +3980,15 @@
       let picks;
       if (st.versus && !battle.skip) {
         // v1.7.3:2P対戦。幕 → 1Pが選ぶ → 幕 → 2Pが選ぶ
-        if (!(await ttCover("1Pの番", `ROUND ${st.round + 1}。2Pは画面を見ないでください`, "1Pが選ぶ"))) return;
+        // v1.7.5:出せるキャラが1人だけの側は、選ぶ画面(と交代の幕)を出さない
+        const only = (side) => TB.allowed(st, side).length === 1;
+        if (!only("left") && !(await ttCover("1Pの番", `ROUND ${st.round + 1}。2Pは画面を見ないでください`, "1Pが選ぶ"))) return;
         const a = await ttMyPick(st, token, "left");
         if (a == null || token !== battle.token) return;
         let b;
         if (battle.skip) b = ttAutoPick(st, "right");
         else {
-          if (!(await ttCover("2Pの番", "画面を2Pに渡してください。1Pは画面を見ないでください", "2Pが選ぶ"))) return;
+          if (!only("right") && !(await ttCover("2Pの番", "画面を2Pに渡してください。1Pは画面を見ないでください", "2Pが選ぶ"))) return;
           b = await ttMyPick(st, token, "right");
         }
         if (b == null || token !== battle.token) return;
@@ -3869,10 +4030,12 @@
       if (!last || token !== battle.token) return;
       for (const side of res.ko) fighterEl(side).classList.add("tt-down");
       // v1.7.1:最後の1人が受け継ぐ・神官の回復
+      // v1.7.5:1人目に倒れたキャラの属性と、2人目(最後)に倒れたキャラの属性とスキル
       for (const x of res.inherit) {
         const skills = x.skills.length ? `スキル${x.skills.map((n) => `『${n}』`).join("")}と` : "";
-        const two = x.element && x.element !== x.fromElement ? `(属性は${x.fromElement}+${x.element}の2つに)` : "";
-        logLine({ type: "skill" }, `${x.toName}は${x.fromName}の${skills}属性(${x.element})を受け継いだ!${two}`);
+        const others = (x.gained || []).slice(0, -1).map((g) => `${g.name}の属性(${g.element})`).join("・");
+        const all = [x.fromElement].concat(x.elements || []).filter(Boolean);
+        logLine({ type: "skill" }, `${x.toName}は${others ? others + "と、" : ""}${x.fromName}の${skills}属性(${x.element})を受け継いだ!(属性は${all.join("+")}の${all.length}つに)`);
         if (!battle.skip) {
           arenaFx(`<small>継承</small>${UI.esc(x.toName)}`, `fx-transform ${x.side}`, 1300);
           if (!(await wait(1300, token))) return;
@@ -3887,8 +4050,13 @@
       const ev = res.events.slice().reverse().find((e) => e.hp);
       const shownHp = { left: ev ? ev.hp.left : res.before.left.hp, right: ev ? ev.hp.right : res.before.right.hp, max: { left: ev && ev.maxHp ? ev.maxHp.left : res.before.left.maxHp, right: ev && ev.maxHp ? ev.maxHp.right : res.before.right.maxHp } };
       battle.ttHeal = st.done ? null : ttHealsOf(st, hp0, picks, shownHp, res);
+      // v1.7.4:お互いの全員が戦ったら、次のフェイズ
+      if (res.phase) {
+        logLine({ type: "match" }, `━━ PHASE ${res.phase}:お互いの全員が戦ったので、また全員出せる ━━`);
+        if (!battle.skip) arenaFx(`<small>NEXT</small>PHASE ${res.phase}`, "fx-match", 1200);
+      }
       ttRenderStrip(st);
-      if (!st.done && !(await wait(res.ko.length ? 900 : 500, token))) return;
+      if (!st.done && !(await wait(res.phase && !battle.skip ? 1300 : res.ko.length ? 900 : 500, token))) return;
     }
     ttFinish(st);
   }
@@ -3914,9 +4082,11 @@
       return `<li>${UI.charIcon(u.char, "small", { noWeapon: true })}<div><b>${ttKingTag(st, side, i)}${UI.esc(u.name)}</b><small>${UI.esc(u.className)} ・ ${UI.esc(u.weapon.name)}${u.char.generated ? " ・ 新しく生まれたキャラ" : ""}</small>
         <span class="tt-rv-skill">${TB.skillsOf(u).map((n) => UI.skillChip(n, false)).join("") || '<span class="muted">スキルなし</span>'}<span class="muted">HP${u.maxHp} 力${s.str} 魔力${s.mag} 技${s.skl} 速さ${s.spd} 幸運${s.lck} 守備${s.def} 魔防${s.res}</span></span></div>${u.hp <= 0 ? '<span class="tt-ko">撃破</span>' : ""}</li>`;
     }).join("");
+    // v1.7.4:相手のチームの情報は、最初は閉じておく(押すと開く)
+    const fold = (title, body) => `<details class="tt-rv-fold"><summary class="tt-rv-title">${title}<small>(押すと開く)</small></summary><ul class="tt-rv">${body}</ul></details>`;
     $("#tt-reveal").innerHTML = st.versus
-      ? `<p class="tt-rv-title">1Pのチーム</p><ul class="tt-rv">${rows("left")}</ul><p class="tt-rv-title">2Pのチーム</p><ul class="tt-rv">${rows("right")}</ul>`
-      : `<p class="tt-rv-title">相手のチーム</p><ul class="tt-rv">${rows("right")}</ul>`;
+      ? fold("1Pのチーム", rows("left")) + fold("2Pのチーム", rows("right"))
+      : fold("相手のチーム", rows("right"));
     $("#btn-tt-again").textContent = st.versus ? "同じチームでもう一度(1Pと2P)" : "同じチームで次の相手と戦う";
     $$(".btn-rematch").forEach((b) => (b.hidden = true));
     $("#btn-back-prep").hidden = true;
@@ -3932,16 +4102,29 @@
       if (seq) {
         $("#battle-result").hidden = true;
         const token = battle.token;
-        seq().then(() => { if (token === battle.token) $("#battle-result").hidden = false; });
+        seq().then(() => { if (token === battle.token) { $("#battle-result").hidden = false; ttTopNext(st); } });
         return;
       }
       $("#battle-result").hidden = false;
+      ttTopNext(st);
       return;
     }
     $("#tt-arc-reveal").innerHTML = "";
     $("#arc-result").hidden = true;
     $("#tt-result").hidden = false;
     $("#battle-result").hidden = false;
+    ttTopNext(st);
+  }
+  // v1.7.4:相手のチームを倒したら(1Pの勝ち)、「次へ」を速度・結果まで飛ばすの上にも出す。押すと下の「次へ」と同じ
+  //   アーケードの3on3:下の「次へ」(結果を見る)と同じ / 3on3:「同じチームで次の相手と戦う」と同じ。2P対戦は出さない
+  function ttTopNext(st) {
+    const box = $("#tt-topnext"), btn = $("#btn-tt-topnext");
+    const arc = !$("#arc-result").hidden;
+    const target = arc ? $("#btn-arc-next") : $("#btn-tt-again");
+    box.hidden = st.versus || st.winner !== "left" || !target || target.hidden;
+    if (box.hidden) return;
+    btn.textContent = arc ? target.textContent : "次の相手と戦う";
+    btn.onclick = () => target.click();
   }
 
   $("#btn-start").addEventListener("click", () => startBattle());

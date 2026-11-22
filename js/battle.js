@@ -211,7 +211,9 @@
 
   // v1.5.0:属性の不利(炎<水<雷<風<炎、光⇔闇。天・地はなし)。不利な側は属性の補正が無効
   // v1.7.2:3on3で属性を受け継ぐと、属性を2つ持つ(char.element2)。属性ごとに不利を見て、効く分だけ足す
-  const elementsOf = (char) => (char ? [char.element, char.element2].filter((x, i, a) => x && a.indexOf(x) === i) : []);
+  // v1.7.4:同じ属性を受け継いだときは、2つとも数える(補正が重なる)
+  // v1.7.5:受け継いだ属性は element2・element3(4on4は element4)まで
+  const elementsOf = (char) => (char ? [char.element, char.element2, char.element3, char.element4].filter(Boolean) : []);
   const weakOne = (element, enemy) => elementsOf(enemy.char).some((x) => (C.elementWeakTo[element] || []).includes(x));
   function elementWeak(u, enemy) {
     if (!u || !enemy || !u.char || !enemy.char) return false;
@@ -321,6 +323,7 @@
       if (hasSkill(att, def, "怒り") && att.hp * 2 <= att.maxHp) crit += 50;
       if (fear && !guarded) crit -= 10;
       if (hasSkill(def, att, "挑発")) crit += C.taunt.crit; // v1.6.5:『挑発』相手(挑発された側)の必殺+5
+      if (hasSkill(def, att, "影") && !guarded) crit -= C.shadow.critDown; // v1.7.4:『影』相手の必殺-5
     }
     let critAvoid = d.lck;
     // 『一発屋』(v1.4.3):当たれば必ず必殺(必殺が出ない武器は除く)
@@ -374,12 +377,13 @@
     const rumble = hasSkill(u, enemy, "鳴動") && now.con >= curStats(enemy, u).con ? now.con : 0;
     const taunted = hasSkill(enemy, u, "挑発") && !resistsDown(u, enemy) ? C.taunt.hit : 0;
     const tauntCrit = hasSkill(enemy, u, "挑発") && !w.noCrit ? C.taunt.crit : 0; // v1.6.5:相手の挑発で自分の必殺+5
+    const shadowCrit = hasSkill(enemy, u, "影") && !w.noCrit && !resistsDown(u, enemy) ? C.shadow.critDown : 0; // v1.7.4:相手の影で自分の必殺-5
     return {
       attack: el.attack + tri * C.triangleMight + (sb[key] || 0) + dv(key) + rumble,
       defense: el.defense + (ew.isMagic ? sb.res || 0 : sb.def || 0),
       hit: el.hit + b.hit + tri * C.triangleHit + (sb.skl || 0) * 2 + (sb.lck || 0) + dv("skl") * 2 + dv("lck") + (hasSkill(u, enemy, "千里眼") ? 20 : 0) - taunted,
       avoid: el.avoid + b.avoid + (w.avoidBonus || 0) + (sb.lck || 0) + dv("spd") * 2 + dv("lck") + (hasSkill(u, enemy, "順風耳") ? 20 : 0) + (ce.avoid || 0) + (ce.spd || 0) * 2,
-      crit: b.crit + (w.critBonus || 0) + classCrit(u) + Math.floor((sb.skl || 0) / 2) + (Math.floor(now.skl / 2) - Math.floor(form.skl / 2)) + (rageSkills(u, enemy).includes("怒り") && !w.noCrit ? 50 : 0) + tauntCrit,
+      crit: b.crit + (w.critBonus || 0) + classCrit(u) + Math.floor((sb.skl || 0) / 2) + (Math.floor(now.skl / 2) - Math.floor(form.skl / 2)) + (rageSkills(u, enemy).includes("怒り") && !w.noCrit ? 50 : 0) + tauntCrit - shadowCrit,
     };
   }
 
@@ -453,9 +457,12 @@
   // v1.6.3:『援軍』のキャラ。ペガサスナイト Lv10・手槍(5%でファルコンナイト Lv1・ぎんの槍)。能力値はランダム
   //   能力値 = 職業の基本値 + 個人差(キャラ作成と同じ 0〜2、HPは0〜3)、ペガサスナイトはそこから成長率(±10)で Lv15 まで上げる
   // v1.6.7:ファルコンナイト(12%)は、ペガサスナイトを Lv20 まで上げてからクラスチェンジした強さ(Lv1)
-  function reinforcementChar(rng) {
+  // v1.7.4:foeLevel(相手のレベル。ベオクの下級職で数えた値)が Lv15 より低いときは、ペガサスナイトは相手のレベルで出る
+  //   (ファルコンナイトは今までどおり。相手が上級職ならLv15のまま)
+  function reinforcementChar(rng, foeLevel = null) {
     const R = C.reinforcement;
     const falcon = rng.percent(R.falconPercent);
+    const pegLevel = foeLevel != null && foeLevel < R.level ? Math.max(1, foeLevel) : R.level;
     const pk = DB.classByName[R.className];
     const p = DB.promotionOf(R.className);
     const base = pk.base, max = pk.max;
@@ -464,7 +471,7 @@
       stats[k] = Math.min(base[k] + rng.int(0, k === "hp" ? C.personalBaseMax + 1 : C.personalBaseMax), max[k]);
       growth[k] = Math.max(5, pk.growth[k] + rng.int(C.personalGrowthRange[0], C.personalGrowthRange[1]));
     }
-    const grow = falcon ? R.falconFromLevel : R.level;
+    const grow = falcon ? R.falconFromLevel : pegLevel;
     for (let lv = 1; lv < grow; lv++) {
       for (const k of DB.STAT_KEYS) {
         const g = growth[k];
@@ -473,7 +480,7 @@
     }
     // クラスチェンジ:上級職の基本値 − ペガサスナイトの基本値 を足す(上限は上級職の上限)
     if (falcon && p) for (const k of DB.STAT_KEYS) stats[k] = Math.max(stats[k], Math.min(stats[k] + (p.base[k] - p.from[k]), p.max[k]));
-    const level = falcon ? R.falconLevel : R.level;
+    const level = falcon ? R.falconLevel : pegLevel;
     const rn = global.RandomChar && global.RandomChar.randomName;
     const elements = Object.keys(DB.elementBonus);
     const weapon = falcon ? R.falconWeapon : R.weapon;
@@ -485,11 +492,23 @@
     };
   }
 
+  // v1.7.4:援軍のレベルを合わせるための、相手のレベル(ベオクの下級職で数えた値)。
+  //   上級職は Lv15 以上として扱う(null)。ラグズはベオク − 10 で数えるので +10。アーケードは arcadeLv
+  const UPPER = new Set(Object.values(C.elitePromotions || {}));
+  function foeLevelOf(u) {
+    if (!u || !u.char) return null;
+    if (UPPER.has(u.className) || UPPER.has(u.char.className) || u.char.reinforcement) return null;
+    const lv = u.char.arcadeLv != null ? u.char.arcadeLv : u.char.level;
+    if (lv == null) return null;
+    return u.char.race === "ラグズ" ? lv + 10 : lv;
+  }
+
   // ---- 自動戦闘 ----
   // left/right: makeUnit で作ったもの(bio・skill 設定済み)。rng: Rng.createBattleRng()
   // 戻り値: { events, winner: "left" | "right" | "draw" }
   // opts.firstSide: 1ラウンド目の先攻("left"/"right")。画面の先攻ルーレットで決めた結果を渡す
   function simulate(left, right, rng, opts = {}) {
+    const opts_ = opts; // v1.7.4:strike(引数 opts が別にある)から見るため
     const events = [];
     const units = { left, right };
     const other = (u) => (u === left ? right : left);
@@ -596,7 +615,7 @@
       const label = opts.label || "攻撃";
       const lead = `${att.name}の${label}!`;
       const fx = opts.fx || null; // v1.6.4:奥義の演出(流星・月光・太陽・天空)
-      // v1.6.4:『影』15%の確率で、相手は見失い、攻撃が外れる
+      // v1.6.4:『影』15%の確率で、相手は見失い、攻撃が外れる(v1.7.4:25%)
       if (hasSkill(def, att, "影") && rng.percent(C.shadow.missPercent)) {
         skillUp(def, "影", `${att.name}は${def.name}を見失った`);
         push({ type: "miss", actor: att.side, target: def.side, lead, result: "見失った!", fx, n: opts.n, text: `${lead}……見失った!` });
@@ -724,7 +743,8 @@
       // ポイズン・燃焼(v1.6.4:『地の祝福』は状態異常を受けない)
       if (att.weapon.status && def.hp > 0 && !earthWard(def, att)) {
         const already = def.status && def.status.name === att.weapon.status;
-        def.status = { name: att.weapon.status, turns: C.statusEffect.turns }; // かかっていたら効果時間を延ばす
+        // v1.7.4:3on3(oneRound)は4ラウンド続く(ほかのモードは2ラウンド)
+        def.status = { name: att.weapon.status, turns: opts_.oneRound ? (C.team && C.team.statusTurns) || C.statusEffect.turns : C.statusEffect.turns }; // かかっていたら効果時間を延ばす
         if (!already) push({ type: "status-add", actor: att.side, target: def.side, text: `${def.name}は${att.weapon.status}状態になった` });
       }
       // 『狙撃』の睡眠(v1.3.4):技÷2の確率。眠っている間は攻撃できず、回避0
@@ -882,10 +902,11 @@
       if (round >= C.lateBloomer.fromRound && !o.lateBloom && hasSkill(o, foe, "大器晩成")) {
         o.lateBloom = true; o.maxHp += C.lateBloomer.amount; o.hp += C.lateBloomer.amount;
       }
-      if (hasSkill(o, foe, "空の祝福")) heal(o, Math.floor(o.maxHp * C.skyBlessingPercent / 100));
     };
+    // v1.7.4:回復・空の祝福は戦闘の終わり(ラウンドの終わり)に回復する
     const benchEnd = (o, foe) => {
       if (hasSkill(o, foe, "回復")) heal(o, Math.floor(o.maxHp / 10));
+      if (hasSkill(o, foe, "空の祝福")) heal(o, Math.floor(o.maxHp * C.skyBlessingPercent / 100));
       if (!o.laguz || o.laguz.fixed) return;
       if (o.laguz.transformed) {
         o.laguz.gauge = Math.max(0, o.laguz.gauge - C.laguzGauge.decay);
@@ -894,6 +915,35 @@
         gainGauge(o, C.laguzGauge.roundGain);
         transformIfFull(o);
       }
+    };
+    // v1.7.4:戦闘の終わりの回復(『回復』最大HPの10%・『空の祝福』最大HPの20%)。回復量は発動のイベントに直接入れる
+    const endHeal = (u) => {
+      for (const [name, pct] of [["回復", 10], ["空の祝福", C.skyBlessingPercent]]) {
+        if (u.hp <= 0 || u.hp >= u.maxHp || !hasSkill(u, other(u), name)) continue;
+        const h = heal(u, Math.floor(u.maxHp * pct / 100));
+        skillUp(u, name, `HPを${h}回復`, { heal: h });
+      }
+    };
+    // v1.7.5:状態異常(ポイズン・燃焼)のダメージ。ラウンドの終わりに受ける(前はラウンドの始め)
+    const slipDamage = (u) => {
+      if (u.hp <= 0 || !u.status) return;
+      if (goddessGuards(u, other(u))) return; // 女神の加護:継続ダメージも受けない
+      const dmg = Math.max(1, Math.floor(u.maxHp * (C.statusEffect.percent[u.status.name] || 8) / 100));
+      const dealt = damageTo(u, dmg);
+      push({ type: "status", target: u.side, damage: dealt, text: `${u.status.name}の効果!${u.name}に${dealt}ダメージ` });
+      u.status.turns--;
+      if (u.status.turns <= 0) u.status = null;
+    };
+    // v1.7.4:3on3の援軍。前のラウンドから残っている援軍(allyState)は、ラウンドの始めにまた代わりに戦う
+    const bringAlly = (u) => {
+      const a = u.allyState;
+      if (!a || a.hp <= 0) return false;
+      const owner = { ...u, allyState: null };
+      const keep = { side: u.side, teamFear: u.teamFear };
+      for (const k of Object.keys(u)) delete u[k];
+      Object.assign(u, a, keep, { returnTo: owner });
+      push({ type: "swap", actor: u.side, char: u.char, weaponId: (u.equip || u.weapon).id, ally: true, forecast: fc(), text: `${owner.name}の援軍:${u.className}の${u.name}が代わりに戦う!(HP${u.hp})` });
+      return true;
     };
     for (;;) {
     while (!dead() && round < maxRounds) {
@@ -917,10 +967,13 @@
       push({ type: "round", round, first: first.side, text: `── ラウンド${round} ── ${first.name}の先攻${reason}` });
 
       // v1.6.3:『援軍』開幕にペガサスナイト(5%でファルコンナイト)が参戦し、代わりに戦う
-      if (round === 1) {
+      // v1.7.4:3on3(oneRound)は、はじめて出たラウンドに参戦し、倒れるまで次のラウンドも代わりに戦う
+      if (opts.oneRound) for (const u of [first, second]) bringAlly(u);
+      if (round === 1 || opts.oneRound) {
         for (const u of [first, second]) {
-          if (!hasSkill(u, other(u), "援軍") || u.reinforced) continue;
-          const ally = reinforcementChar(rng);
+          if (u.returnTo || !hasSkill(u, other(u), "援軍") || u.reinforced) continue;
+          // v1.7.4:相手のレベルが Lv15 より低ければ、ペガサスナイトは相手のレベルで出る
+          const ally = reinforcementChar(rng, foeLevelOf(other(u)));
           const owner = { ...u, reinforced: true };
           const au = makeUnit(ally, ally.weapon, u.side);
           const name = u.name;
@@ -986,10 +1039,7 @@
           u.hp += C.lateBloomer.amount;
           skillUp(u, "大器晩成", `体格以外の能力値+${C.lateBloomer.amount}`, { forecast: fc() });
         }
-        if (hasSkill(u, foe, "空の祝福") && u.hp < u.maxHp) {
-          const h = heal(u, Math.floor(u.maxHp * C.skyBlessingPercent / 100));
-          skillUp(u, "空の祝福", `HPを${h}回復`, { heal: h });
-        }
+        // v1.7.4:『空の祝福』はラウンドの始め → 戦闘の終わり(ラウンドの終わり。『回復』と同じところ)
         if (hasSkill(u, foe, "咆哮") && foe.roarStacks < C.roar.maxStacks && sklRoll(u, foe, "咆哮")) {
           if (resistsDown(foe, u)) { // v1.4.3:安定も下がらない
             if (!foe.guardShown) {
@@ -1005,20 +1055,10 @@
         }
       }
 
-      // 状態異常(ポイズン・燃焼)
-      for (const u of [first, second]) {
-        if (dead() || !u.status) continue;
-        if (goddessGuards(u, other(u))) continue; // 女神の加護:継続ダメージも受けない
-        const dmg = Math.max(1, Math.floor(u.maxHp * (C.statusEffect.percent[u.status.name] || 8) / 100));
-        const dealt = damageTo(u, dmg);
-        push({ type: "status", target: u.side, damage: dealt, text: `${u.status.name}の効果!${u.name}に${dealt}ダメージ` });
-        u.status.turns--;
-        if (u.status.turns <= 0) u.status = null;
-      }
+      // v1.7.5:状態異常(ポイズン・燃焼)のダメージは、ラウンドの始め → ラウンドの終わり(攻撃のやりとりのあと)
 
       // v1.6.7:援軍が倒れたら、その場で自分に交代して残りの攻撃を続ける(act)
       const act = (a, d) => { attack(a, d); swapBack(); };
-      swapBack(); // 状態異常で援軍が倒れたとき
       act(first, second);
       act(second, first);
       if (!dead() && calc(first, second).doubles) act(first, second);
@@ -1032,12 +1072,10 @@
         if (!dead() && calc(u, foe).doubles) act(u, foe);
       }
 
-      // 『回復』
-      for (const u of [first, second]) {
-        if (dead() || !hasSkill(u, other(u), "回復") || u.hp >= u.maxHp) continue;
-        const h = heal(u, Math.floor(u.maxHp / 10));
-        skillUp(u, "回復", `HPを${h}回復`, { heal: h }); // v1.4.5:回復量は発動のイベントに直接入れる
-      }
+      // v1.7.5:状態異常(ポイズン・燃焼)は、ラウンドの終わりにダメージ(前はラウンドの始め)
+      for (const u of [first, second]) if (!dead()) slipDamage(u);
+      // 『回復』・『空の祝福』(v1.7.4:どちらも戦闘の終わりに回復)
+      for (const u of [first, second]) if (!dead()) endHeal(u);
 
       // v1.6.5:『盗む』(シーフ・アサシンの兵種スキル)。相手より速さが4以上高いと、ラウンドの終わりに幸運%で発動
       //   傷薬(HP10回復・70%)/特効薬(HP全回復・15%)/ドーピングアイテム(力・技・幸運・守備のどれか+2・15%)
@@ -1117,6 +1155,10 @@
     //   (前は倒れた時点で止まり、残ったキャラ・控えの化身ゲージがそのままだった)
     if (opts.oneRound && dead()) {
       for (const side of ["left", "right"]) for (const o of bench[side] || []) if (o.hp > 0) benchEnd(o, units[side === "left" ? "right" : "left"]);
+      // v1.7.5:相手が倒れて戦闘が終わったときも、生き残ったキャラはラウンドの終わりの状態異常のダメージを受ける
+      for (const u of [left, right]) if (u.hp > 0) slipDamage(u);
+      // v1.7.4:相手が倒れて戦闘が終わったときも、生き残ったキャラの『回復』『空の祝福』が働く(戦闘の終わりに回復)
+      for (const u of [left, right]) if (u.hp > 0) endHeal(u);
       for (const u of [left, right]) {
         if (u.hp <= 0 || !u.laguz || (u.laguz.transformed && u.laguz.fixed)) continue;
         if (u.laguz.transformed) {
@@ -1141,11 +1183,15 @@
     for (const u of [left, right]) {
       if (!u.returnTo) continue;
       const owner = u.returnTo;
+      // v1.7.4:3on3では、生きている援軍は次のラウンドも残る(呼んだキャラの allyState にしまう)
+      const ally = opts.oneRound && u.hp > 0 ? { ...u } : null;
+      if (ally) { delete ally.returnTo; delete ally.allyState; }
       for (const k of Object.keys(u)) delete u[k];
       Object.assign(u, owner);
+      u.allyState = ally;
     }
     return { events, winner };
   }
 
-  global.Battle = { reinforcementChar, elementWeak, promote, classEffect, makeUnit, cloneUnit, previewRoundOne, calc, forecast, bonusSummary, transformPlan, simulate, decideFirst, hasPriority, priorityReason, triangle, attackSpeed, biorhythmMod, drawSkill, skillPool, statsDuel, hasSkill, elemOf, classCrit, elementsOf };
+  global.Battle = { foeLevelOf, reinforcementChar, elementWeak, promote, classEffect, makeUnit, cloneUnit, previewRoundOne, calc, forecast, bonusSummary, transformPlan, simulate, decideFirst, hasPriority, priorityReason, triangle, attackSpeed, biorhythmMod, drawSkill, skillPool, statsDuel, hasSkill, elemOf, classCrit, elementsOf };
 })(window);

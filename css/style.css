@@ -2325,3 +2325,66 @@ button.tt-card.rest:disabled { cursor: not-allowed; }
 /* v1.7.3:相手の3つ目(2P対戦)は下の段に */
 .ts-v.bo-row#tt-foe { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .ts-v.bo-row#tt-foe .bo-btn[data-v="2p"] { grid-column: 1 / -1; }
+
+/* =================== v1.7.4 =================== */
+/* モード選択:闘技場・アーケードの中の「1対1 / 3on3(/アイクモード)」は、同じメニューの中で入れかえる */
+.mode-menu .btn[hidden] { display: none !important; }
+/* v1.7.4:3on3でキャラを選ぶとき、能力値(1行)と武器 */
+.tt-stats { display: flex; flex-wrap: wrap; gap: 2px 9px; font-size: .74rem; color: var(--muted); }
+.tt-stats span { white-space: nowrap; }
+.tt-stats b { color: #e8ecff; margin-left: 3px; font-weight: 600; }
+.tt-stats em { font-style: normal; color: #ffb27a; margin-right: 2px; }
+.tt-wline { font-size: .74rem; padding: 3px 6px; background: rgba(255, 255, 255, .03); border-radius: 6px; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
+.tt-wline .w-effect { flex-basis: 100%; }
+.tt-slot .tt-slot-body .li-name .elem-badge, .tt-slot .tt-slot-body .li-name [class*="elem"] { margin-left: 6px; }
+.tt-arc-member .tt-slot-body { min-width: 0; }
+/* v1.7.4:3on3で相手のチームを倒したときの「次へ」(速度・結果まで飛ばすの上) */
+.tt-topnext { display: flex; justify-content: center; margin: 12px 0 0; }
+.tt-topnext[hidden] { display: none; }
+.tt-topnext .btn { min-width: 220px; background: linear-gradient(#f2c94c, #c8951e); color: #1a1405; border-color: #ffe08a; font-weight: bold; }
+/* v1.7.4:相手のチームの情報は最初は閉じている(押すと開く) */
+.tt-rv-fold { margin: 0 0 8px; }
+.tt-rv-fold > summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: #141b33; }
+.tt-rv-fold > summary::-webkit-details-marker { display: none; }
+.tt-rv-fold > summary::before { content: "▶"; font-size: .7em; color: var(--muted); }
+.tt-rv-fold[open] > summary::before { content: "▼"; }
+.tt-rv-fold > summary small { font-weight: normal; color: var(--muted); font-size: .72rem; }
+.tt-rv-fold[open] > summary small { display: none; }
+.tt-rv-fold .tt-rv { margin-top: 6px; }
+/* v1.7.4:3on3の援軍(次に出たときも代わりに戦う) */
+.tt-ally { font-size: .68rem; color: #9fe0ff; border: 1px solid #3a6a8a; border-radius: 4px; padding: 0 4px; background: #10243a; white-space: nowrap; }
+/* v1.7.4:3on3のレベルアップ(3人分を1回で) */
+.levelup.lu-team-mode .levelup-box { width: min(760px, 96vw); max-height: 96vh; overflow-y: auto; }
+.levelup.lu-team-mode .lu-lv { display: none; }
+.lu-team { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.lu-col { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 8px; background: rgba(0, 0, 0, .18); }
+.lu-col-name { margin: 0; font-weight: bold; font-size: 1rem; }
+.lu-col-class { margin: 0; font-size: .74rem; color: #cfd6f0; }
+.lu-col-lv { margin: 0 0 4px; font-size: .82rem; }
+.lu-col-lv b { font-size: 1rem; }
+.lu-col .lu-stat { font-size: .85rem; }
+@media (orientation: portrait) and (max-width: 600px) {
+  .lu-team { grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .lu-col { padding: 5px 4px; }
+  .lu-col-name { font-size: .8rem; }
+  .lu-col-class { font-size: .62rem; }
+  .lu-col .lu-stat { font-size: .72rem; }
+}
+.levelup.lu-team-mode .lu-stats { display: block; }
+.levelup.lu-team-mode .lu-col .lu-stat { grid-template-columns: 2.6em 2em 1fr; gap: 4px; padding: 2px 2px; }
+/* v1.7.4:選ぶ画面のフェイズ */
+.tt-phase { display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 4px; font-size: .78em; font-weight: bold; letter-spacing: .06em; color: #c9f0ff; background: #12324a; border: 1px solid #3f7aa0; }
+/* v1.7.5:アーケードの準備の「残りをランダムで選ぶ」「選び直す」は3on3のときだけ */
+.asetup:not(.team) .as-team-only { display: none; }
+/* v1.7.5:3on3の準備の「その他の設定」(人数・武器変更。最初は閉じている) */
+.tt-moreopts { margin: 4px 0 2px; }
+.tt-moreopts > summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 6px; background: #141b33; font-size: .85rem; }
+.tt-moreopts > summary::-webkit-details-marker { display: none; }
+.tt-moreopts > summary::before { content: "▶"; font-size: .7em; color: var(--muted); }
+.tt-moreopts[open] > summary::before { content: "▼"; }
+.tt-moreopts > summary small { font-weight: normal; color: var(--muted); font-size: .72rem; }
+.tt-moreopts[open] > summary small { display: none; }
+.tt-moreopts .ts-row { margin-top: 6px; }
+/* v1.7.5:3on3のルールの「くわしく」の行は小さく */
+.as-rules li.tt-rule-more { font-size: .9em; color: var(--muted); list-style: none; }
+.howto-ul li.howto-more { font-size: .9em; color: var(--muted); }

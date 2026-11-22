@@ -92,7 +92,8 @@
     const cls = DB.classByName[char.className];
     const tribe = cls && cls.tribe ? `<span class="badge tribe" title="部族">${esc(cls.tribe)}</span>` : "";
     // v1.7.2:受け継いだ2つ目の属性(3on3)も並べる
-    const elem = opts.element ? elementChip(char.element, opts.foeElement) + (char.element2 ? `<span class="elem-plus" title="受け継いだ属性">+</span>${elementChip(char.element2, opts.foeElement)}` : "") : "";
+    // v1.7.5:受け継いだ属性は2つ以上のこともある(element2・element3・element4)
+    const elem = opts.element ? elementChip(char.element, opts.foeElement) + ["element2", "element3", "element4"].filter((k) => char[k]).map((k) => `<span class="elem-plus" title="受け継いだ属性">+</span>${elementChip(char[k], opts.foeElement)}`).join("") : "";
     return `<div class="char-head fighter-head"><div class="icon-col">${charIcon(char, opts.big ? "big" : "", { noWeapon: opts.noIconWeapon })}${raceChip(char)}</div><div class="char-title">
       <div class="char-name">${esc(char.name)}${genderMark(char)}${opts.nameExtra || ""}</div>
       <div class="char-class">${esc(char.className)}${char.arcadeLv ? `<small class="lv1">Lv${char.arcadeLv}</small>` : ""}</div>
@@ -293,7 +294,7 @@
   }
   // v1.7.2:属性のバッジ。受け継いだ2つ目の属性があれば「+」でつなぐ
   function elementBadges(char) {
-    return elementBadge(char.element) + (char.element2 ? `<span class="elem-plus" title="受け継いだ属性">+</span>${elementBadge(char.element2)}` : "");
+    return elementBadge(char.element) + ["element2", "element3", "element4"].filter((k) => char[k]).map((k) => `<span class="elem-plus" title="受け継いだ属性">+</span>${elementBadge(char[k])}`).join("");
   }
   function bioText(bio) {
     if (bio.name === "普通") return "補正なし";

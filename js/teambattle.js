@@ -23,6 +23,22 @@
 //   ・ラウンドの先攻・後攻を、選ぶ前に分かるようにする(nextFirst。ラウンド1のランダムも作ったときに決めておく)
 //   ・2P対戦(1台を交代で使う)のため、相手から見たか(seen)を両方のチームで持つ
 //   ・対戦中の武器の変更(changeWeapon。ベオクだけ)
+// v1.7.4(ガトーの改善点リスト v1.7.4)
+//   ・フェイズ:1人が戦ったら、フェイズが変わるまで出せない。お互いの生きているキャラが全員戦ったら、次のフェイズ
+//     (v1.7.3 の「2ラウンド続けて出たら休み」はフェイズに置きかえ。片方のチームが先に全員戦ったときは、そのチームは生きているだれでも出せる)
+//   ・決着がつかないときの上限は 60 → 20 ラウンド
+//   ・王のHPは+3(職業のHPの上限まで)
+//   ・同じ属性を受け継いだときは、属性の補正が重なる(char.element2 に同じ属性)
+//   ・コンピューターの選び方を賢く:1ラウンドを試しに戦わせて(何回か)、倒される見込み・倒す見込みを数える。
+//     王は倒されるとチームの負けなので、倒されそうな相手がいるうちは出さない
+//   ・援軍は、はじめて出たラウンドに参戦し、倒れるまで次のラウンドも代わりに戦う(battle.js。allyState)
+// v1.7.5(ガトーの改善点リスト v1.7.5 と、3on3ルールの整理案)
+//   ・決着がつかないときの上限は 20 → 30 ラウンド(Config.maxRounds)
+//   ・闘技場の3on3でも、スキルの抽選に援軍が出る(NO_SKILLS を空に)
+//   ・神官の回復は、ラウンドの終わりごと → フェイズが変わったとき
+//   ・継承:王がひとりになったら、1人目に倒れたキャラの属性と、2人目に倒れたキャラの属性とスキルを受け継ぐ
+//     (4on4は、倒れた仲間全員の属性と、最後に倒れたキャラのスキル)。属性は char.element2 / element3 / element4
+//   ・使っていない「休み」のしくみ(REST_AFTER・streak・restNext)を消す(整理案。フェイズに置きかえ済み)
 (function (global) {
   "use strict";
   const C = global.Config;
@@ -31,9 +47,9 @@
   const G = global.Generator;
 
   const SIZE = 3;
-  // 援軍は3on3では出さない(控えと入れ替えのしくみが重なるため)
-  const NO_SKILLS = ["援軍"];
-  const MAX_ROUNDS = 60;
+  // v1.7.5:援軍も抽選に出る(前は「控えと入れ替えのしくみが重なるため」出さなかった。ガトー指示)
+  const NO_SKILLS = [];
+  const MAX_ROUNDS = C.maxRounds; // v1.7.4:60 → 20、v1.7.5:30(Config.maxRounds と同じ)
   const SIDES = ["left", "right"];
   const foeOf = (side) => (side === "left" ? "right" : "left");
 
@@ -140,25 +156,35 @@
       // v1.7.3:両方のチームで「相手から見たか」を持つ(2P対戦で使う。1Pから見た相手は right)
       seen: { left: Array(n.left).fill(false), right: Array(n.right).fill(false) },      // 出てきたか(出てきたら一部公開)
       skillSeen: { left: Array(n.left).fill(false), right: Array(n.right).fill(false) }, // 一度戦ったか(スキルを全部公開)
-      streak: { left: Array(n.left).fill(0), right: Array(n.right).fill(0) },           // v1.7.3:続けて出たラウンドの数
+      phase: 1,          // v1.7.4:フェイズ
+      used: { left: Array(n.left).fill(false), right: Array(n.right).fill(false) },     // v1.7.4:このフェイズに戦ったか
       coin: rng.next() < 0.5 ? "left" : "right", // v1.7.3:ラウンド1の先攻(先攻の武器・待ち伏せがないとき)
       done: false, winner: null, judge: false, endText: "",
     };
   }
 
   const alive = (st, side) => st.team[side].map((u, i) => i).filter((i) => st.team[side][i].hp > 0);
-  // v1.7.1:このラウンドに出せるキャラ。前のラウンドに出たキャラは休み(生きているのが1人だけのときは出せる)
-  // v1.7.3:2ラウンド続けて出たキャラが、次の1ラウンド休み(出せるキャラがほかにいないときは出せる)
-  const REST_AFTER = 2;
-  const streakOf = (st, side, i) => (st.streak && st.streak[side] ? st.streak[side][i] || 0 : 0);
+  // このラウンドに出せるキャラ(v1.7.4:フェイズ)。このフェイズにもう戦ったキャラ(st.used)は出せない。
+  //   出せるキャラがいないチームは、生きているだれでも出せる(v1.7.1〜v1.7.3 の「休み」は v1.7.5 で消した)
+  const usedOf = (st, side, i) => !!(st.used && st.used[side] && st.used[side][i]);
   function allowed(st, side) {
     const a = alive(st, side);
-    const rest = a.filter((i) => streakOf(st, side, i) < REST_AFTER);
-    return rest.length ? rest : a;
+    const fresh = a.filter((i) => !usedOf(st, side, i));
+    return fresh.length ? fresh : a;
   }
-  const resting = (st, side) => { const a = allowed(st, side); return st.active[side] != null && !a.includes(st.active[side]) && st.team[side][st.active[side]].hp > 0 ? st.active[side] : null; };
-  // v1.7.3:このラウンドも出ると、次のラウンドは休みになるキャラ(1ラウンド続けて出ている)
-  const restNext = (st, side, i) => streakOf(st, side, i) === REST_AFTER - 1 && alive(st, side).length > 1;
+  // v1.7.4:このフェイズにもう戦ったので出せないキャラか(画面の「出撃済み」)
+  const isUsed = (st, side, i) => st.team[side][i].hp > 0 && usedOf(st, side, i) && !allowed(st, side).includes(i);
+  const resting = (st, side) => { const i = st.active[side]; return i != null && isUsed(st, side, i) ? i : null; };
+  // v1.7.4:お互いの生きているキャラが全員戦ったら、次のフェイズ
+  function advancePhase(st) {
+    const done = SIDES.every((side) => alive(st, side).every((i) => usedOf(st, side, i)));
+    if (!done) return false;
+    st.phase = (st.phase || 1) + 1;
+    for (const side of SIDES) st.used[side] = st.team[side].map(() => false);
+    return true;
+  }
+  // v1.7.4:援軍が残っていれば、戦うのは援軍(戦闘予測・コンピューターの見込みに使う)
+  const fighterOf = (u) => (u.allyState && u.allyState.hp > 0 ? { ...u.allyState, side: u.side, teamFear: u.teamFear } : u);
 
   // v1.7.3:このラウンドの先攻。picks があれば、出るキャラの先攻の武器・『待ち伏せ』も入れる
   //   戻り値:{ side, reason, fixed(先攻の武器などで決まった) , random(両方にあってランダム) }
@@ -221,27 +247,66 @@
     const die = Math.min(30, a.hp / Math.max(0.2, perRound(b, a)));
     return die - kill;
   }
-  // side の側が出すキャラ。相手が何を出すかは分からないので、相手の生きているキャラ全員との平均で決める
-  // (いま出ている相手は少し重く見る)。たまに(25%)気まぐれで選ぶ
-  // v1.7.1:前のラウンドに出たキャラは選ばない。相手(foe)の前のラウンドのキャラも休みなので、数に入れない。
-  // v1.7.3:休みは2ラウンド続けて出たキャラ(allowed)。
-  //   王は倒されると負けなので、分が悪いときは出しにくくする
-  function cpuPick(st, side, rng) {
-    const mine = allowed(st, side), foes = allowed(st, foeOf(side));
-    if (mine.length <= 1) return mine[0];
-    if (rng && rng.next() < 0.25) return mine[rng.int(0, mine.length - 1)];
-    let best = mine[0], score = -Infinity;
-    for (const i of mine) {
-      let v = 0, w = 0;
-      for (const j of foes) {
-        v += matchScore(st.team[side][i], st.team[foeOf(side)][j]);
-        w += 1;
-      }
-      v = w ? v / w : 0;
-      if (i === st.king[side]) v -= v < 0 ? 4 : 1;
-      if (v > score) { score = v; best = i; }
+  // side の側が出すキャラ。相手が何を出すかは分からないので、相手の出せるキャラ全員との見込みで決める
+  // v1.7.4:フェイズで出せるキャラ(allowed)から選ぶ
+  // v1.7.4:賢くした(ガトー指示)。それぞれの組み合わせで1ラウンドを試しに AI.sims 回戦わせて、
+  //   倒す見込み・倒される見込み・与えるダメージ・受けるダメージを数える(+ 長い目で見た matchScore を少し)。
+  //   王(と最後の1人)が倒されるとチームの負けなので、とても重く見る。王が倒されそうな相手(見込み AI.kingRisk 以上)が
+  //   出てくるかもしれないうちは、ほかに出せるキャラがいれば王を出さない。気まぐれ(AI.random)は、王を危ない目にあわせない範囲で
+  const AI = { sims: 8, kingRisk: 0.34, random: 0.1, lose: 8, ms: 20 };
+  function trialRound(st, side, i, j, rng) {
+    const me = clone(st.team[side][i]), foe = clone(st.team[foeOf(side)][j]);
+    const L = side === "left" ? me : foe, R = side === "left" ? foe : me;
+    const so = { oneRound: true, round0: st.round, firstR1Side: st.firstR1Side, bench: { left: [], right: [] }, newPair: false };
+    if (st.round === 0) {
+      const f = nextFirst(st, { [side]: i, [foeOf(side)]: j });
+      if (f.side) { so.firstSide = f.side; so.firstReason = ""; }
     }
-    return best;
+    B.simulate(L, R, rng, so);
+    return { me, foe };
+  }
+  function pairOdds(st, side, i, j, rng) {
+    const u0 = st.team[side][i], f0 = st.team[foeOf(side)][j];
+    let kill = 0, die = 0, dealt = 0, taken = 0;
+    for (let n = 0; n < AI.sims; n++) {
+      const { me, foe } = trialRound(st, side, i, j, rng);
+      if (foe.hp <= 0) kill++;
+      if (me.hp <= 0) die++;
+      dealt += Math.max(0, f0.hp - Math.max(0, foe.hp)) / Math.max(1, f0.maxHp);
+      taken += Math.max(0, u0.hp - Math.max(0, me.hp)) / Math.max(1, u0.maxHp);
+    }
+    return { kill: kill / AI.sims, die: die / AI.sims, dealt: dealt / AI.sims, taken: taken / AI.sims };
+  }
+  // 戦ってみたときの、side から見た良さ。i が倒れると負けになる(王・最後の1人)なら倒される見込みを重く見る
+  function pickScores(st, side, rng) {
+    const mine = allowed(st, side), foes = allowed(st, foeOf(side));
+    const aliveMine = alive(st, side).length, aliveFoe = alive(st, foeOf(side)).length;
+    const val = {}, risk = {};
+    for (const i of mine) {
+      const fatal = i === st.king[side] || aliveMine === 1;
+      risk[i] = 0;
+      for (const j of foes) {
+        const o = pairOdds(st, side, i, j, rng);
+        const killVal = aliveFoe === 1 ? AI.lose : 1.2;
+        const dieVal = fatal ? AI.lose : 1;
+        val[i + ":" + j] = o.kill * killVal - o.die * dieVal + o.dealt - o.taken + (AI.ms ? matchScore(fighterOf(st.team[side][i]), fighterOf(st.team[foeOf(side)][j])) / AI.ms : 0);
+        if (fatal) risk[i] = Math.max(risk[i], o.die);
+      }
+    }
+    const Q = (i, M, F) => F.reduce((a, j) => a + val[i + ":" + j], 0) / Math.max(1, F.length);
+    return mine.map((i) => ({ i, v: Q(i, mine, foes), risk: risk[i], king: i === st.king[side] }));
+  }
+  function cpuPick(st, side, rng) {
+    const mine = allowed(st, side);
+    if (mine.length <= 1) return mine[0];
+    const aiRng = global.Rng && global.Rng.createSeededRng ? global.Rng.createSeededRng(`tt-ai:${st.round}:${side}:${rng ? rng.next() : 0}`) : rng;
+    const scores = pickScores(st, side, aiRng);
+    // 王が倒されそうなら、ほかに出せるキャラがいるうちは出さない
+    const safe = scores.filter((x) => !(x.king && x.risk >= AI.kingRisk));
+    const pool = safe.length ? safe : scores;
+    // 気まぐれ(AI.random)は、王を危ない目にあわせない範囲で
+    if (rng && rng.next() < AI.random) return pool[rng.int(0, pool.length - 1)].i;
+    return pool.reduce((a, b) => (b.v > a.v ? b : a)).i;
   }
 
   // ---- 1ラウンド戦う ----
@@ -249,7 +314,7 @@
   function playRound(st, picks, rng) {
     for (const side of SIDES) {
       if (!(st.team[side][picks[side]] && st.team[side][picks[side]].hp > 0)) throw new Error("倒れたキャラは出せない");
-      if (!allowed(st, side).includes(picks[side])) throw new Error("休みのキャラは出せない");
+      if (!allowed(st, side).includes(picks[side])) throw new Error("出撃済みのキャラは出せない");
     }
     const first = nextFirst(st, picks);
     const before = { left: st.team.left[picks.left], right: st.team.right[picks.right] };
@@ -280,8 +345,8 @@
       st.seen[side][picks[side]] = true;
       // v1.7.1:一度戦った相手のスキルは、ラウンドが終わったら全部見える(ラウンドの途中は、発動したら公開)
       st.skillSeen[side][picks[side]] = true;
-      // v1.7.3:続けて出た数(出なかったキャラは0に戻る)
-      st.streak[side] = st.streak[side].map((v, i) => (i === picks[side] ? v + 1 : 0));
+      // v1.7.4:このフェイズに戦った
+      st.used[side][picks[side]] = true;
     }
     const ko = SIDES.filter((s) => team[s][picks[s]].hp <= 0);
     for (const s of ko) st.fallen[s].push(picks[s]);
@@ -297,15 +362,23 @@
     st.quiet = hpAfter === hpBefore && !all.some((u) => u.hp > 0 && u.status) ? st.quiet + 1 : 0;
     checkOver(st, rng);
     const inherit = [], heals = [];
+    let phase = null;
     if (!st.done) {
       for (const side of SIDES) { const x = inheritLast(st, side); if (x) inherit.push(x); }
-      for (const side of SIDES) heals.push(...priestHeal(st, side));
+      if (advancePhase(st)) {
+        phase = st.phase; // v1.7.4:次のフェイズへ
+        // v1.7.5:神官の回復は、フェイズが変わったとき(前はラウンドの終わりごと)
+        for (const side of SIDES) heals.push(...priestHeal(st, side));
+      }
     }
-    return { events: sim.events, before, ko, inherit, heals };
+    return { events: sim.events, before, ko, inherit, heals, phase };
   }
 
   // v1.7.1:2人倒れて最後の1人(王)になったら、2人目に倒れたキャラのスキル(全部)と属性を受け継ぐ
   // v1.7.3:4on4のときは、3人倒れて最後の1人になったら、直前(3人目)に倒れたキャラから(3on3では今までどおり2人目)
+  // v1.7.5:王がひとりになったら、1人目に倒れたキャラの属性と、2人目(最後)に倒れたキャラの属性とスキルを受け継ぐ。
+  //   属性は倒れた順に char.element2・element3(4on4は element4)。同じ属性でも足す(補正が重なる)
+  const ELEM_SLOTS = ["element2", "element3", "element4"];
   function inheritLast(st, side) {
     const a = alive(st, side);
     const f = st.fallen[side];
@@ -316,12 +389,18 @@
     const added = skillsOf(donor).filter((n) => !have.includes(n));
     if (!heir.skill && added.length) heir.skill = added[0];
     heir.extraSkills = (heir.extraSkills || []).concat(added.filter((n) => n !== heir.skill));
-    // v1.7.2:属性は置きかえず、2つ目の属性として足す(char.element2。同じ属性なら1つのまま)。補正は2つ分(battle.js elemOf)
-    const element = donor.char.element;
+    // v1.7.2:属性は置きかえず、2つ目の属性として足す(char.element2)。補正は2つ分(battle.js elemOf)
+    // v1.7.4:同じ属性でも2つ目として足す(補正が重なる。前は1つのまま)
+    // v1.7.5:倒れた仲間全員の属性を、倒れた順に足す(3on3は2つ。自分の属性と合わせて3つ)
     const fromElement = heir.char.element;
-    if (element && element !== fromElement) heir.char = { ...heir.char, element2: element };
-    st.inherited[side] = { from, to: a[0], skills: added, element, fromElement };
-    return { side, from, to: a[0], skills: added, element, fromElement, fromName: donor.name, toName: heir.name };
+    const gained = f.map((k) => ({ name: st.team[side][k].name, element: st.team[side][k].char.element })).filter((x) => x.element);
+    const ch = { ...heir.char };
+    gained.slice(0, ELEM_SLOTS.length).forEach((x, n) => { ch[ELEM_SLOTS[n]] = x.element; });
+    heir.char = ch;
+    const element = donor.char.element;
+    const elements = gained.map((x) => x.element);
+    st.inherited[side] = { from, to: a[0], skills: added, element, elements, fromElement };
+    return { side, from, to: a[0], skills: added, element, elements, gained, fromElement, fromName: donor.name, toName: heir.name };
   }
 
   // v1.7.1:神官(司祭)がチームにいて生きていれば、ラウンドの終わりに神官以外のキャラ(控えも)のHPが最大HPの15%回復
@@ -370,5 +449,5 @@
     return st.winner;
   }
 
-  global.TeamBattle = { SIZE, SIZES: [3, 4], REST_AFTER, NO_SKILLS, MAX_ROUNDS, KING, pickOpponents, bestWeaponVs, create, alive, allowed, resting, restNext, nextFirst, changeWeapon, cpuWeapon, hpCap, isPriest, skillsOf, kingDown, cpuPick, matchScore, playRound, inheritLast, priestHeal, ratio, autoPlay };
+  global.TeamBattle = { SIZE, SIZES: [3, 4], NO_SKILLS, MAX_ROUNDS, KING, AI, pickOpponents, bestWeaponVs, create, alive, allowed, isUsed, resting, advancePhase, fighterOf, nextFirst, changeWeapon, cpuWeapon, hpCap, isPriest, skillsOf, kingDown, cpuPick, pickScores, pairOdds, matchScore, playRound, inheritLast, priestHeal, ratio, autoPlay };
 })(window);
