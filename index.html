@@ -10,10 +10,11 @@
 <meta name="apple-mobile-web-app-title" content="闘技場">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <title>闘技場バトル</title>
-<link rel="stylesheet" href="css/style.css">
+<!-- v1.8.0:css・js に ?v=版 をつける(GitHub Pages で前の版の main.js などがキャッシュに残り、新しい機能が動かないのを防ぐ。版を上げたら一緒に変える) -->
+<link rel="stylesheet" href="css/style.css?v=1.8.0">
 <!-- v1.6.6:スマホ縦向きのバトル準備・バトル(portrait_auto.css は tools/build_portrait_css.py が作る) -->
-<link rel="stylesheet" href="css/portrait_auto.css">
-<link rel="stylesheet" href="css/portrait.css">
+<link rel="stylesheet" href="css/portrait_auto.css?v=1.8.0">
+<link rel="stylesheet" href="css/portrait.css?v=1.8.0">
 </head>
 <body>
 
@@ -624,21 +625,21 @@
     <button type="button" class="btn btn-small talk-skip" id="talk-skip" hidden>会話をスキップ ▶▶</button>
   </div>
 
-  <script src="js/gamedata.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/rng.js"></script>
-  <script src="js/gamedb.js"></script>
-  <script src="js/generator.js"></script>
-  <script src="js/randomchar.js"></script>
-  <script src="js/battle.js"></script>
-  <script src="js/tournament.js"></script>
-  <script src="js/arcade.js"></script>
-  <script src="js/teambattle.js"></script>
-  <script src="js/storage.js"></script>
-  <script src="js/ui.js"></script>
+  <script src="js/gamedata.js?v=1.8.0"></script>
+  <script src="js/config.js?v=1.8.0"></script>
+  <script src="js/rng.js?v=1.8.0"></script>
+  <script src="js/gamedb.js?v=1.8.0"></script>
+  <script src="js/generator.js?v=1.8.0"></script>
+  <script src="js/randomchar.js?v=1.8.0"></script>
+  <script src="js/battle.js?v=1.8.0"></script>
+  <script src="js/tournament.js?v=1.8.0"></script>
+  <script src="js/arcade.js?v=1.8.0"></script>
+  <script src="js/teambattle.js?v=1.8.0"></script>
+  <script src="js/storage.js?v=1.8.0"></script>
+  <script src="js/ui.js?v=1.8.0"></script>
   <!-- v1.8.0:戦闘アニメ(ドット絵と動き) -->
-  <script src="js/battleanim_sprites.js"></script>
-  <script src="js/battleanim.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/battleanim_sprites.js?v=1.8.0"></script>
+  <script src="js/battleanim.js?v=1.8.0"></script>
+  <script src="js/main.js?v=1.8.0"></script>
 </body>
 </html>
