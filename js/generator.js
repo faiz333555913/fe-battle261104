@@ -215,5 +215,38 @@
     return changed;
   }
 
-  global.Generator = { elementOf, renameWeapons, normalizeInputs, generateCharacter, seedKey, classPool, weaponMarks, ensureMarks, needsMarks, refreshLaguzStats, GENERATOR_VERSION };
+  // v1.8.0:ドラゴンナイト・ドラゴンマスターは槍 → 斧に変更。前に作ったキャラが槍を持っていたら、
+  //   入力から作り直したときと同じ斧に持ち替える(作り直せないときは、入力から決まる別の乱数で斧を選ぶ)。変わったら true
+  const isDragonKnight = (name) => /^ドラゴン(ナイト|マスター)/.test(String(name || ""));
+  function fixDragonAxes(char) {
+    if (!char || !Array.isArray(char.weapons) || !isDragonKnight(char.className)) return false;
+    const isLance = (id) => { const w = DB.weapons[id]; return !!w && w.category === "lance"; };
+    if (!char.weapons.some(isLance)) return false;
+    let next = null;
+    try {
+      const inp = char.inputs && normalizeInputs(char.inputs);
+      if (inp && inp.ok) {
+        const g = generateCharacter(inp.value);
+        if (isDragonKnight(g.className)) next = g.weapons.slice();
+      }
+    } catch (e) { next = null; }
+    if (!next || !next.length) {
+      const key = char.inputs ? seedKey(char.inputs) : String(char.id);
+      const rng = global.Rng.createSeededRng(key + "|axe");
+      let pool = (DB.weaponsByCategory.axe || []).filter((w) => !w.onlyClasses);
+      next = [];
+      const count = Math.min(char.weapons.length || C.weaponCountDefault, pool.length);
+      for (let i = 0; i < count; i++) { const w = rng.weightedPick(pool, DB.weaponRarity); next.push(w.id); pool = pool.filter((x) => x !== w); }
+      const order = Object.values(DB.weapons).map((w) => w.id);
+      next.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    }
+    // 槍以外(アーケードで手に入れた武器など)はそのまま残す
+    const keep = char.weapons.filter((id) => !isLance(id) && !next.includes(id));
+    char.weapons = next.concat(keep);
+    if (char.weapon && isLance(char.weapon)) char.weapon = char.weapons[0];
+    delete char.marksVersion; ensureMarks(char);
+    return true;
+  }
+
+  global.Generator = { fixDragonAxes, elementOf, renameWeapons, normalizeInputs, generateCharacter, seedKey, classPool, weaponMarks, ensureMarks, needsMarks, refreshLaguzStats, GENERATOR_VERSION };
 })(window);

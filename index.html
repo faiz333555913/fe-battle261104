@@ -27,9 +27,11 @@
     <!-- v1.4.0:最初は Press click(v1.4.1で名前変更)→ 押すと点滅と同時に暗転 → メニューがスライドして出てくる -->
     <section id="screen-title" class="screen active" data-stage="press">
       <div class="title-box">
+        <!-- v1.8.0:タイトルの紋章(ガトーの素材。マゼンタを抜いた) -->
+        <img class="title-emblem" src="assets/title_emblem.png" alt="" width="512" height="344">
         <p class="title-sub">― 名前に宿る力で戦え ―</p>
         <h1 class="title-heading">闘技場バトル</h1>
-        <p class="version">v1.7.5</p>
+        <p class="version">v1.8.0</p>
         <button type="button" class="press-start" id="press-start">Press click</button>
         <nav class="title-menu">
           <button type="button" class="btn btn-main slide-l" data-goto="create">キャラ作成</button>
@@ -158,6 +160,8 @@
               <label class="fx-toggle"><input type="checkbox" id="opt-skills" checked><span class="fx-switch" aria-hidden="true"></span><span>スキル抽選</span></label>
               <label class="fx-toggle"><input type="checkbox" id="opt-roulette" checked><span class="fx-switch" aria-hidden="true"></span><span title="スキル抽選・先攻後攻のルーレットの演出">抽選の演出</span></label>
               <label class="fx-toggle" title="好きなスキルを1つ選んで戦う(ONのときはスキル抽選・抽選の演出はなし)"><input type="checkbox" id="opt-skillpick"><span class="fx-switch" aria-hidden="true"></span><span>スキル選択</span></label>
+              <!-- v1.8.0:戦闘アニメ(ドット絵のキャラが動いて戦う。バトル画面の「戦闘アニメ」ボタンでも切りかえられる) -->
+              <label class="fx-toggle" title="ドット絵のキャラが動いて戦う(どのモードでも。バトル画面のボタンでも切りかえられる)"><input type="checkbox" id="opt-anim"><span class="fx-switch" aria-hidden="true"></span><span>戦闘アニメ</span></label>
             </div>
             <button type="button" class="btn pt-sheet-close" id="btn-pt-close">閉じる</button>
           </div>
@@ -476,6 +480,8 @@
       <div class="battle-controls">
         <button type="button" class="btn btn-small" id="btn-speed">速度:ふつう</button>
         <button type="button" class="btn btn-small" id="btn-skip">結果まで飛ばす</button>
+        <!-- v1.8.0:戦闘アニメのON/OFF(対戦の途中でも切りかえられる) -->
+        <button type="button" class="btn btn-small btn-anim" id="btn-anim">戦闘アニメ:OFF</button>
       </div>
       <ol id="battle-log" class="battle-log"></ol>
       <div id="battle-result" class="battle-result" hidden>
@@ -518,7 +524,7 @@
 
 
   <!-- v1.4.0:タイトルの動く背景と暗転 -->
-  <div class="title-bg" aria-hidden="true"><div class="tb-glow"></div><div class="tb-glow tb-glow2"></div><div class="tb-sparks" id="title-sparks"></div></div>
+  <div class="title-bg" aria-hidden="true"><div class="tb-scene" id="title-scene"><i class="tb-torch" style="left:4.5%;top:56%"></i><i class="tb-torch" style="left:26.2%;top:65%"></i><i class="tb-torch" style="left:41.6%;top:63.6%"></i><i class="tb-torch" style="left:60.6%;top:57%"></i><i class="tb-torch" style="left:88.1%;top:47.2%"></i></div><div class="tb-shade"></div><div class="tb-glow"></div><div class="tb-glow tb-glow2"></div><div class="tb-sparks" id="title-sparks"></div></div>
   <div class="title-fade" id="title-fade" aria-hidden="true"></div>
 
   <!-- v1.4.0:キャラを生み出したときのレベルアップ演出 -->
@@ -630,6 +636,9 @@
   <script src="js/teambattle.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/ui.js"></script>
+  <!-- v1.8.0:戦闘アニメ(ドット絵と動き) -->
+  <script src="js/battleanim_sprites.js"></script>
+  <script src="js/battleanim.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

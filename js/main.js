@@ -1175,6 +1175,7 @@
   function stopBattle() {
     battle.token++;
     battle.skip = false;
+    animStop(); // v1.8.0:戦闘アニメの途中なら最後まで進めて止める
     if (battle.wake) battle.wake();
     $("#roulette").hidden = true;
     $("#tt-pick").hidden = true; // v1.7.0
@@ -1228,6 +1229,180 @@
     if ($("#screen-prep").classList.contains("active") && prep.left) renderPrepSides();
   });
   renderOpts();
+
+  // ================= v1.8.0:戦闘アニメ =================
+  // 設定で「戦闘アニメ」をONにすると、バトル画面のキャラ枠の上に、ドット絵の戦闘アニメ(js/battleanim.js)を重ねて見せる。
+  // 攻撃(流星・天空などの連続攻撃、勇者の武器・ぶちかましの2回目も1回の動きにまとめる)・奥義・化身はアニメで見せ、
+  // 命中・必殺・ダメージ・回復はゲームの計算のまま。ROUND・スキルの帯・K.O. などは今までどおりアニメの上に出る。OFFなら今までどおり
+  const BA = global.BattleAnim || null;
+  const ANIM_KEY = "arenaBattle.battleAnim";
+  let animPref = false;
+  try { animPref = global.localStorage.getItem(ANIM_KEY) === "1"; } catch (e) { /* 初期値のまま(OFF) */ }
+  const anim = { pend: {}, quiet: new WeakSet(), shown: false, syncing: false };
+  const animActive = () => !!BA && animPref && anim.shown;
+  // ゲームの奥義 → アニメの奥義
+  const ANIM_OUGI = { 流星: "meteor", 月光: "luna", 太陽: "sol", 天空: "aether", 瞬殺: "lethal", 陽光: "sunray", 鳴動: "quake", 衝撃: "impact", 狙撃: "snipe", 咆哮: "roar", 地の祝福: "earth", 空の祝福: "sky" };
+  const ANIM_SELF = new Set(["roar", "earth", "sky"]);
+  function animSaveRender() {
+    try { global.localStorage.setItem(ANIM_KEY, animPref ? "1" : "0"); } catch (e) { /* 保存できなくても動く */ }
+    const box = $("#opt-anim");
+    if (box) box.checked = animPref;
+    const btn = $("#btn-anim");
+    if (btn) { btn.textContent = animPref ? "戦闘アニメ:ON" : "戦闘アニメ:OFF"; btn.classList.toggle("on", animPref); }
+  }
+  // 画面に出ているキャラ枠から、アニメの2人を作る(HP・威力・命中・必殺は画面の数字のまま)
+  function animDesc(side) {
+    const u = side === "left" ? battle.L : battle.R;
+    const el = fighterEl(side);
+    const c = u.char || {};
+    const w = u.weapon || {};
+    const num = (sel, d) => { const n = $(sel, el); const v = n ? Number(n.textContent) : NaN; return Number.isFinite(v) ? v : d; };
+    const colorName = (c.inputs && c.inputs.color) || ((C.colors || []).find((x) => x.hex === c.colorHex) || {}).name || "";
+    const className = (battle.cls && battle.cls[side]) || u.className || c.className || "";
+    const moveType = u.moveType || c.moveType || (DB.classByName[className] || {}).moveType || "";
+    return {
+      id: BA.spriteFor({ className, gender: c.gender, race: c.race, category: w.category, moveType }),
+      name: u.name, cls: className, wpn: w.name || "",
+      hp: num(".hp-cur", u.hp), max: (battle.maxHp && battle.maxHp[side]) || u.maxHp,
+      st: { dmg: num('[data-k="damage"] .n', 0), hit: num('[data-k="hit"] .n', 0), crt: num('[data-k="crit"] .n', 0) },
+      color: colorName, transformed: el.classList.contains("transformed"), move: { category: w.category },
+    };
+  }
+  function animSetup() {
+    const arena = $("#arena");
+    if (!BA || !animPref || !battle.L || !battle.R) {
+      if (anim.shown && BA) BA.unmount();
+      anim.shown = false;
+      arena.classList.remove("ba-on");
+      return;
+    }
+    anim.pend = {};
+    BA.setSpeed(battle.speed);
+    BA.setup(animDesc("left"), animDesc("right"));
+    BA.mount(arena);
+    anim.shown = true;
+    arena.classList.add("ba-on");
+  }
+  function animStop() { if (BA && anim.shown) BA.flush(); }
+  // 化身などで威力・命中・必殺が変わったら、アニメの下の数字も合わせる
+  function animStats(f) {
+    if (!f) return;
+    for (const side of ["left", "right"]) if (f[side]) BA.setStats(side, { dmg: f[side].damage, hit: f[side].hit, crt: f[side].crit });
+  }
+  // 1つのイベントをアニメで見せる。true:見せ終わった(いつもの演出はしない)/ false:いつもの演出も続ける
+  async function animEvent(e, token) {
+    if (e.type === "round") { anim.pend = {}; return false; }
+    if (e.type === "hit" || e.type === "miss") return animStrike(e, token);
+    if (e.type === "skill" && e.ougi && ANIM_OUGI[e.skill]) {
+      const k = ANIM_OUGI[e.skill];
+      applyState(e);
+      if (anim.quiet.has(e)) return true; // 狙撃:攻撃といっしょに見せた
+      if (ANIM_SELF.has(k)) {
+        BA.setSpeed(battle.speed);
+        await BA.ougiSelf(e.actor, k, { heal: e.heal != null ? e.heal : null, down: !!e.target });
+        animStats(e.forecast);
+        return token === battle.token;
+      }
+      anim.pend[e.actor] = k; // 次の攻撃を奥義の演出で見せる
+      return true;
+    }
+    if (e.type === "transform" || e.type === "revert") {
+      applyState(e);
+      BA.setSpeed(battle.speed);
+      await BA.transform(e.actor, e.type === "transform", null);
+      animStats(e.forecast);
+      return true;
+    }
+    animNote(e);
+    return false;
+  }
+  // 攻撃以外のイベント:アニメの上にも数字・文字を出す
+  function animNote(e) {
+    animStats(e.forecast);
+    switch (e.type) {
+      case "status": BA.hurt(e.target, e.damage, e.hp[e.target], "#c890ff"); if (e.finishing) BA.ko(e.target); break;
+      case "self": BA.hurt(e.target, e.damage, e.hp[e.target], "#ff9080"); if (e.finishing) BA.ko(e.target); break;
+      case "heal": BA.heal(e.target, e.amount); break;
+      case "skill":
+        if (e.heal) BA.heal(e.actor, e.heal);
+        if (e.buffText) BA.popAt(e.actor, e.buffText, "#ffe080", 8);
+        if (e.elite) BA.popAt(e.actor, "クラスチェンジ", "#ffe080", 8);
+        if (e.skill === "大器晩成") BA.popAt(e.actor, "能力アップ", "#ffe080", 8);
+        if (e.target && e.skill === "咆哮") BA.popAt(e.target, "能力ダウン", "#ff9080", 8);
+        break;
+      case "sleep": BA.sleep(e.target, true); break;
+      case "asleep": BA.popAt(e.actor, "Zzz…", "#c8d8ff", 8); break;
+      case "wake": BA.sleep(e.actor, false); BA.popAt(e.actor, e.paralysis ? "麻痺が治った" : "目覚めた!", "#b0ffc0", 8); break;
+      case "paralyze": BA.popAt(e.target, "麻痺", "#fff060", 10); break;
+      case "break": BA.popAt(e.target, "武器破壊", "#ff9080", 8); break;
+      case "spd-down": BA.popAt(e.target, e.label || `速さ-${e.amount}`, "#ff9080", 8); break;
+      case "cancel": BA.popAt(e.actor, "無効", "#a8d8ff", 9); break;
+      case "rage": if (e.on) BA.glow(e.actor, 60); break;
+      default: break;
+    }
+  }
+  // 攻撃をアニメで見せる。同じキャラの続けての攻撃(流星・天空・勇者の武器・ぶちかまし)は1回の動きにまとめる
+  async function animStrike(e, token) {
+    const evs = battle.events, start = battle.idx - 1;
+    const A = e.actor, T = e.target;
+    const att = A === "left" ? battle.L : battle.R;
+    const fxGroup = e.fx === "meteor" || e.fx === "aether";
+    const brave = !!(att && att.weapon && att.weapon.brave);
+    const between = (x) => ["heal", "spd-down", "status-add", "gauge"].includes(x.type) || (fxGroup && x.type === "skill" && !x.ougi);
+    const strikes = [e];
+    let last = start;
+    for (let j = start + 1; j < evs.length; j++) {
+      const x = evs[j], prev = strikes[strikes.length - 1];
+      const isStrike = (x.type === "hit" || x.type === "miss") && x.actor === A && x.target === T && !prev.finishing;
+      if (isStrike && ((fxGroup && x.fx === e.fx) || x.bodySlam || (brave && !x.fx && !e.fx && !x.instantKill && strikes.length < 2))) { strikes.push(x); last = j; continue; }
+      if (between(x)) continue;
+      break;
+    }
+    // 攻撃のあとの回復(太陽・リザイア・ルーンソードなど)もまとめる
+    for (let j = last + 1; j < evs.length && between(evs[j]); j++) if (evs[j].type === "heal" && evs[j].actor === A) last = j;
+    // 狙撃:当たったあとに発動するので、先に見つけて攻撃といっしょに見せる
+    let ougi = e.instantKill ? "lethal" : anim.pend[A] || null;
+    for (let j = last + 1; j < evs.length && j <= last + 8; j++) {
+      const x = evs[j];
+      if (["hit", "miss", "round", "end", "swap", "phase2"].includes(x.type)) break;
+      if (x.type === "skill" && x.skill === "狙撃" && x.actor === A && !ougi) { ougi = "snipe"; anim.quiet.add(x); }
+    }
+    delete anim.pend[A];
+    const group = evs.slice(start, last + 1);
+    const recs = strikes.map((x) => ({ hit: x.type === "hit", crit: !!x.crit, damage: x.damage || 0, hpAfter: x.hp[T], guarded: !!x.guarded }));
+    const heals = group.filter((x) => x.type === "heal" && x.actor === A).map((x) => x.amount);
+    const lastEv = group[group.length - 1];
+    $$(".fighter").forEach((f) => f.classList.toggle("attacking", f === fighterEl(A)));
+    BA.setSpeed(battle.speed);
+    await BA.attack(A, { recs, heals, ougi, hpEnd: { left: lastEv.hp.left, right: lastEv.hp.right } });
+    battle.idx = last + 1;
+    if (token !== battle.token) return true;
+    // 記録(ログ・キャラ枠のHPなど)はアニメのあとにまとめて。とどめはいつもの K.O. の演出
+    // (途中のHPをアニメに戻すと、HPが一度増えてからまた減って見え、倒れたキャラが出てきてしまうので、アニメのHPはそのまま)
+    anim.syncing = true;
+    try {
+      for (const x of group) {
+        if (battle.skip) { applyState(x); continue; }
+        if ((x.type === "hit" || x.type === "miss") && x.finishing) {
+          logLine(x);
+          if (!(await koSequence(x.target, token, x)) && token !== battle.token) return true;
+          continue;
+        }
+        applyState(x);
+        animStats(x.forecast);
+      }
+    } finally { anim.syncing = false; }
+    if (!battle.skip && !lastEv.finishing) await wait(250, token);
+    return true;
+  }
+  $("#opt-anim") && $("#opt-anim").addEventListener("change", (e) => { animPref = e.target.checked; animSaveRender(); });
+  $("#btn-anim") && $("#btn-anim").addEventListener("click", () => {
+    animPref = !animPref;
+    animSaveRender();
+    // 対戦の途中でも切りかえられる(次の攻撃から)
+    if ($("#screen-battle").classList.contains("active") && battle.L && battle.R) animSetup();
+  });
+  animSaveRender();
 
   async function startBattle(opts = {}) {
     const { L, R } = prepUnits();
@@ -1426,6 +1601,7 @@
     }
     $("#arena-fx").innerHTML = "";
     endKo();
+    animSetup(); // v1.8.0:戦闘アニメ
   }
 
   const fighterEl = (side) => $(`.fighter[data-side="${side}"]`);
@@ -1441,6 +1617,7 @@
     const fill = $(".hp-fill", el);
     fill.style.width = pct + "%";
     fill.classList.toggle("low", pct <= 30);
+    if (animActive() && !anim.syncing) BA.setHp(side, hp, maxHp); // v1.8.0(攻撃のあとにまとめて記録するときは、アニメのHPはもう合っている)
   }
 
   function setStatus(side, name) {
@@ -1956,6 +2133,13 @@
       // v1.6.3:『援軍』が参戦する/倒れて元のキャラに戻る
       if (e.type === "swap") { if (!(await playSwap(e, token)) && token !== battle.token) return; continue; }
       if (battle.skip) { applyState(e); continue; }
+      // v1.8.0:戦闘アニメ(ONのとき)。攻撃・奥義・化身はアニメで見せる。それ以外はいつもどおり(アニメにも数字などを出す)
+      if (animActive()) {
+        const r = await animEvent(e, token);
+        if (token !== battle.token) return;
+        if (r) continue;
+        if (battle.skip) { applyState(e); continue; }
+      }
       if (e.type === "hit" || e.type === "miss") {
         if (!(await playStrike(e, token)) && token !== battle.token) return;
         continue;
@@ -4130,6 +4314,7 @@
   $("#btn-start").addEventListener("click", () => startBattle());
   $("#btn-skip").addEventListener("click", () => {
     battle.skip = true;
+    if (BA) BA.flush(); // v1.8.0:戦闘アニメも最後まで進める
     $("#arena-fx").innerHTML = "";
     ougiEnd(); // v1.6.4
     endKo();
@@ -4138,6 +4323,7 @@
   $("#btn-speed").addEventListener("click", (e) => {
     battle.speed = battle.speed === 1 ? 0.45 : 1;
     e.target.textContent = battle.speed === 1 ? "速度:ふつう" : "速度:はやい";
+    if (BA) BA.setSpeed(battle.speed); // v1.8.0
   });
   // もう一度:同じキャラ・武器で、バイオリズムと先攻は引き直し。スキルは引き直し or そのまま
   function rematch(keepSkills) {

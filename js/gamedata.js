@@ -3825,16 +3825,16 @@ window.GAME_DATA = {
    {
     "class": "ドラゴンナイト(女)",
     "weaponCategories": [
-     "lance"
+     "axe"
     ],
-    "note": "竜騎士は槍使用と推測"
+    "note": "v1.8.0:斧に変更(ガトー指示。戦闘アニメも斧)"
    },
    {
     "class": "ドラゴンナイト(男)",
     "weaponCategories": [
-     "lance"
+     "axe"
     ],
-    "note": "竜騎士は槍使用と推測"
+    "note": "v1.8.0:斧に変更(ガトー指示。戦闘アニメも斧)"
    },
    {
     "class": "ペガサスナイト",

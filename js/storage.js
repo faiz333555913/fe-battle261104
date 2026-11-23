@@ -18,6 +18,7 @@
       let dirty = false;
       for (const c of arr) {
         if (G.renameWeapons && G.renameWeapons(c)) dirty = true; // v1.6.5:名前が変わった武器
+        if (G.fixDragonAxes && G.fixDragonAxes(c)) dirty = true; // v1.8.0:ドラゴンナイトは斧
         if (G.needsMarks(c)) { G.ensureMarks(c); dirty = true; }
         if (G.refreshLaguzStats(c)) dirty = true;
       }
@@ -120,6 +121,7 @@
       if (!isValid(c) || exists || (only && !only.has(idx))) { skipped++; return; }
       if (global.Generator) { // 印(錬成)は入力から決まるので計算し直す。ラグズの化身後の能力値も今のルールで
         global.Generator.renameWeapons(c); // v1.6.5
+        global.Generator.fixDragonAxes(c); // v1.8.0:ドラゴンナイトは斧
         delete c.marksVersion; global.Generator.ensureMarks(c);
         global.Generator.refreshLaguzStats(c);
       }

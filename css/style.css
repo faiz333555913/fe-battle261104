@@ -2388,3 +2388,42 @@ button.tt-card.rest:disabled { cursor: not-allowed; }
 /* v1.7.5:3on3のルールの「くわしく」の行は小さく */
 .as-rules li.tt-rule-more { font-size: .9em; color: var(--muted); list-style: none; }
 .howto-ul li.howto-more { font-size: .9em; color: var(--muted); }
+
+/* ================= v1.8.0:戦闘アニメ ================= */
+/* 設定で「戦闘アニメ」をONにしたとき、キャラ枠の上にドット絵の戦闘アニメ(256×168ドットを拡大)を重ねる。
+   ROUND・スキルの帯・K.O. などの文字(.arena-fx、z-index 20)はアニメの上に出る */
+.arena .ba-wrap { position: absolute; inset: 0; z-index: 12; background: #05060f; border-radius: 10px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; }
+.arena .ba-canvas { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; image-rendering: crisp-edges; }
+.btn-anim.on { border-color: var(--gold, #e8c86a); color: var(--gold, #e8c86a); }
+
+/* =========================================================
+   v1.8.0:タイトル画面の素材(ガトー作:夜の闘技場の背景・紋章)
+   ========================================================= */
+/* 背景は元の絵(1024×572)をそのまま画面いっぱい(はみ出す分は切る)。ガトー「あらい」で、縮小・減色をやめた */
+.tb-scene { position: absolute; left: 50%; top: 50%; width: max(100vw, 177.78vh); height: max(100vh, 56.25vw); transform: translate(-50%, -50%);
+  background: url("../assets/title_bg.png") center / 100% 100% no-repeat; }
+/* たいまつの火がゆらめく */
+.tb-torch { position: absolute; width: 3.2%; aspect-ratio: 1; margin: -1.6% 0 0 -1.6%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 200, 90, .55) 0%, rgba(255, 150, 40, .18) 45%, transparent 70%);
+  mix-blend-mode: screen; animation: tbtorch 1.7s ease-in-out infinite alternate; }
+.tb-torch:nth-child(2n) { animation-duration: 1.3s; animation-delay: -.4s; }
+.tb-torch:nth-child(3n) { animation-duration: 2.1s; animation-delay: -.9s; }
+@keyframes tbtorch { 0% { opacity: .55; transform: scale(.9); } 40% { opacity: 1; transform: scale(1.08); } 70% { opacity: .7; } 100% { opacity: .95; transform: scale(1); } }
+/* body の背景(グラデーション)が上にかぶって見えなかったので、タイトルのときだけ外す */
+body:has(#screen-title.active) { background: transparent; }
+/* 文字とボタンが読めるように、まん中を少し暗く */
+.tb-shade { position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 70% at 50% 46%, rgba(8, 10, 22, .62) 0%, rgba(8, 10, 22, .38) 55%, rgba(8, 10, 22, .15) 100%); }
+.title-bg .tb-glow { opacity: .55; }
+/* 紋章:ロゴの上(元の絵のマゼンタを抜いて 512×344)。ロゴと同じように淡く光る */
+.title-emblem { display: block; margin: 0 auto 6px; height: clamp(84px, 15vh, 160px); width: auto;
+  animation: logo-glow 4.8s ease-in-out infinite; }
+.title-box { padding-top: 6vh; }
+.title-sub { text-shadow: 0 1px 4px rgba(0, 0, 0, .8); }
+.title-box .version, .press-start { text-shadow: 0 1px 3px rgba(0, 0, 0, .9), 0 0 10px rgba(0, 0, 0, .7); }
+@media (prefers-reduced-motion: reduce) { .tb-torch { animation: none; } .title-emblem { animation: none; } }
+@media (max-height: 500px) and (orientation: landscape) {
+  .title-emblem { height: 40px; margin-bottom: 0; }
+  .title-box { padding-top: 0; }
+}
