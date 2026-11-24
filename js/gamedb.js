@@ -87,7 +87,9 @@
 
   // v1.6.5:名前が変わった武器。前の名前(保存されたキャラ・アーケードの途中のデータ)でも引けるようにする。
   //   列挙はされない(データ集・抽選に二重に出ない)
-  const weaponRenames = { "knife:ポイズンニードル": "knife:蛇毒のナイフ", "knife:シャドウエッジ": "knife:待ち伏せのダガー" };
+  const weaponRenames = { "knife:ポイズンニードル": "knife:蛇毒のナイフ", "knife:シャドウエッジ": "knife:待ち伏せのダガー",
+    // v1.8.1:タカの武器 くちばし → 鉤爪(威力などは同じ)
+    "laguz:くちばし(タカ)": "laguz:鉤爪(タカ)", "laguz:くちばし(ティバーン)": "laguz:鉤爪(ティバーン)" };
   for (const [from, to] of Object.entries(weaponRenames)) {
     if (weapons[to] && !weapons[from]) Object.defineProperty(weapons, from, { value: weapons[to], enumerable: false });
   }

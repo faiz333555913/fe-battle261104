@@ -146,7 +146,8 @@
   // ================= タイトル(v1.4.0) =================
   // PRESS START → 押すと速く点滅 → ゆっくり暗転 → メニューが左右からスライドして中央で止まる
   const titleScreen = $("#screen-title");
-  const reduceMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  // v1.8.1:端末の「視差効果を減らす」がONでも演出は出す(iPhone でタイトルの演出が出なかった)
+  const reduceMotion = () => false;
   const wait_ = (ms) => new Promise((r) => setTimeout(r, ms));
   function enterMenu() {
     if (titleScreen.dataset.stage === "press") return;
@@ -1264,9 +1265,20 @@
       id: BA.spriteFor({ className, gender: c.gender, race: c.race, category: w.category, moveType }),
       name: u.name, cls: className, wpn: w.name || "",
       hp: num(".hp-cur", u.hp), max: (battle.maxHp && battle.maxHp[side]) || u.maxHp,
-      st: { dmg: num('[data-k="damage"] .n', 0), hit: num('[data-k="hit"] .n', 0), crt: num('[data-k="crit"] .n', 0) },
+      st: { dmg: num('[data-k="damage"] .n', 0), hit: num('[data-k="hit"] .n', 0), crt: num('[data-k="crit"] .n', 0), times: animTimes(el) },
+      skills: animSkills(side),
       color: colorName, transformed: el.classList.contains("transformed"), move: { category: w.category },
     };
+  }
+  // v1.8.1:ATK の「×2」(追撃・勇者の武器で2回以上攻撃できるとき)。キャラ枠の威力の表示から読む
+  function animTimes(el) {
+    const x = $('[data-k="damage"] .x2 i', el);
+    const n = x ? Number(String(x.textContent).replace(/[^0-9]/g, "")) : 1;
+    return n > 1 ? n : 1;
+  }
+  // v1.8.1:パネルのクラス/武器の下に出すスキル。キャラ枠に見えているスキル(3on3の相手のまだ出ていないスキルは出さない)
+  function animSkills(side) {
+    return $$(".fighter-row .skills .skill-chip", fighterEl(side)).map((c) => c.textContent.trim()).filter(Boolean);
   }
   function animSetup() {
     const arena = $("#arena");
@@ -1287,19 +1299,25 @@
   // 化身などで威力・命中・必殺が変わったら、アニメの下の数字も合わせる
   function animStats(f) {
     if (!f) return;
-    for (const side of ["left", "right"]) if (f[side]) BA.setStats(side, { dmg: f[side].damage, hit: f[side].hit, crt: f[side].crit });
+    for (const side of ["left", "right"]) if (f[side]) BA.setStats(side, { dmg: f[side].damage, hit: f[side].hit, crt: f[side].crit, times: f[side].times || 1 });
   }
+  function animSkillsSync() { for (const side of ["left", "right"]) BA.setSkills(side, animSkills(side)); }
   // 1つのイベントをアニメで見せる。true:見せ終わった(いつもの演出はしない)/ false:いつもの演出も続ける
   async function animEvent(e, token) {
     if (e.type === "round") { anim.pend = {}; return false; }
     if (e.type === "hit" || e.type === "miss") return animStrike(e, token);
     if (e.type === "skill" && e.ougi && ANIM_OUGI[e.skill]) {
       const k = ANIM_OUGI[e.skill];
-      applyState(e);
+      // v1.8.1:回復する奥義(空の祝福)は、先に回復したHPをアニメに送ると、アニメの回復と2回分増えてから元に戻って見えた。
+      //   キャラ枠だけ先に合わせ、アニメのHPはアニメの回復で増やす(最後にゲームのHPにそろえる)
+      anim.syncing = true;
+      try { applyState(e); } finally { anim.syncing = false; }
+      animSkillsSync();
       if (anim.quiet.has(e)) return true; // 狙撃:攻撃といっしょに見せた
       if (ANIM_SELF.has(k)) {
         BA.setSpeed(battle.speed);
         await BA.ougiSelf(e.actor, k, { heal: e.heal != null ? e.heal : null, down: !!e.target });
+        for (const side of ["left", "right"]) BA.setHp(side, e.hp[side]);
         animStats(e.forecast);
         return token === battle.token;
       }
@@ -1319,6 +1337,7 @@
   // 攻撃以外のイベント:アニメの上にも数字・文字を出す
   function animNote(e) {
     animStats(e.forecast);
+    if (e.type === "skill") animSkillsSync(); // v1.8.1:3on3で公開されたスキルなど
     switch (e.type) {
       case "status": BA.hurt(e.target, e.damage, e.hp[e.target], "#c890ff"); if (e.finishing) BA.ko(e.target); break;
       case "self": BA.hurt(e.target, e.damage, e.hp[e.target], "#ff9080"); if (e.finishing) BA.ko(e.target); break;
@@ -1348,6 +1367,12 @@
     const att = A === "left" ? battle.L : battle.R;
     const fxGroup = e.fx === "meteor" || e.fx === "aether";
     const brave = !!(att && att.weapon && att.weapon.brave);
+    // v1.8.1:『疾風の刃』の攻撃は、どの職業でもウインドの動き
+    const isWind = (x) => typeof x.lead === "string" && x.lead.endsWith("の疾風の刃!");
+    const wind = isWind(e);
+    // v1.8.1:追撃(攻速の差)。勇者の武器以外で、同じキャラの攻撃が相手の攻撃をはさまずに続いたら(後攻の「攻撃+追撃」など)、
+    //   1回の動きにまとめ、追撃はその場で続けて攻撃する(サンプル4の追撃の動き)
+    let follows = 0;
     const between = (x) => ["heal", "spd-down", "status-add", "gauge"].includes(x.type) || (fxGroup && x.type === "skill" && !x.ougi);
     const strikes = [e];
     let last = start;
@@ -1355,6 +1380,8 @@
       const x = evs[j], prev = strikes[strikes.length - 1];
       const isStrike = (x.type === "hit" || x.type === "miss") && x.actor === A && x.target === T && !prev.finishing;
       if (isStrike && ((fxGroup && x.fx === e.fx) || x.bodySlam || (brave && !x.fx && !e.fx && !x.instantKill && strikes.length < 2))) { strikes.push(x); last = j; continue; }
+      if (isStrike && !brave && !fxGroup && !wind && !e.instantKill && !x.fx && !x.instantKill && !isWind(x) && !follows && !anim.pend[A]
+        && evs.slice(start + 1, j).every((y) => y.type !== "skill")) { follows++; strikes.push(x); last = j; continue; }
       if (between(x)) continue;
       break;
     }
@@ -1374,9 +1401,19 @@
     const lastEv = group[group.length - 1];
     $$(".fighter").forEach((f) => f.classList.toggle("attacking", f === fighterEl(A)));
     BA.setSpeed(battle.speed);
-    await BA.attack(A, { recs, heals, ougi, hpEnd: { left: lastEv.hp.left, right: lastEv.hp.right } });
+    // v1.8.1:とどめは、HPが0になった瞬間に K.O. を出す(アニメはスローになって、そのまま倒れたキャラが消えるまで進む)
+    let koAt = 0, koDiv = null;
+    const finisher = group.find((x) => (x.type === "hit" || x.type === "miss") && x.finishing);
+    BA.onKo((side) => {
+      if (!finisher || side !== finisher.target || koAt || battle.skip || token !== battle.token) return;
+      koAt = Date.now();
+      koDiv = koLetters(finisher, 9000); // 倒れたキャラが消えるまで出しておく
+    });
+    try {
+      await BA.attack(A, { recs, heals, ougi, wind, hpEnd: { left: lastEv.hp.left, right: lastEv.hp.right } });
+    } finally { BA.onKo(null); }
     battle.idx = last + 1;
-    if (token !== battle.token) return true;
+    if (token !== battle.token) { endKo(); return true; }
     // 記録(ログ・キャラ枠のHPなど)はアニメのあとにまとめて。とどめはいつもの K.O. の演出
     // (途中のHPをアニメに戻すと、HPが一度増えてからまた減って見え、倒れたキャラが出てきてしまうので、アニメのHPはそのまま)
     anim.syncing = true;
@@ -1385,6 +1422,16 @@
         if (battle.skip) { applyState(x); continue; }
         if ((x.type === "hit" || x.type === "miss") && x.finishing) {
           logLine(x);
+          if (koAt) {
+            // K.O. はもう出ている。文字が出終わるまで待つ
+            for (const side of ["left", "right"]) { setHp(side, x.hp[side]); setStatus(side, x.status[side]); setGauge(side, x.laguz[side]); }
+            // 倒れたキャラが消えたあと、少しだけ K.O. を残してから消す(最低でも文字が出そろう 1.6秒)
+            const ok = await wait(Math.max(350, 1600 - (Date.now() - koAt)), token);
+            if (koDiv) koDiv.remove();
+            endKo();
+            if (!ok && token !== battle.token) return true;
+            continue;
+          }
           if (!(await koSequence(x.target, token, x)) && token !== battle.token) return true;
           continue;
         }
@@ -1772,6 +1819,7 @@
     div.innerHTML = html;
     fx.appendChild(div);
     setTimeout(() => div.remove(), ms);
+    return div;
   }
 
   function logLine(e, text) {
@@ -1838,13 +1886,17 @@
     el.classList.add("ko-target");
     if (!(await wait(700, token))) { endKo(); return false; }
     flash(el, "ko");
-    // v1.3.4:瞬殺のときは「K.O.」ではなく「瞬・殺。」
-    const ss = !!(e && e.instantKill);
-    const letters = (ss ? ["瞬", "・", "殺", "。"] : ["K", ".", "O", "."]).map((ch, i) => `<span class="ko-l" style="animation-delay:${0.1 + i * 0.35}s">${ch}</span>`).join("");
-    arenaFx(letters, ss ? "fx-ko ss" : "fx-ko", 2400);
-    const ok = await wait(2200, token);
+    koLetters(e);
+    const ok = await wait(KO_TEXT_MS, token);
     endKo();
     return ok;
+  }
+  // 「K」「.」「O」「.」の文字(v1.3.4:瞬殺のときは「瞬・殺。」)。v1.8.1:戦闘アニメでも使うので関数に
+  const KO_TEXT_MS = 2200;
+  function koLetters(e, ms = 2400) {
+    const ss = !!(e && e.instantKill);
+    const letters = (ss ? ["瞬", "・", "殺", "。"] : ["K", ".", "O", "."]).map((ch, i) => `<span class="ko-l" style="animation-delay:${0.1 + i * 0.35}s">${ch}</span>`).join("");
+    return arenaFx(letters, ss ? "fx-ko ss" : "fx-ko", ms);
   }
   function endKo() {
     $("#arena").classList.remove("slowmo", "ko-dim", "ss-dim");
@@ -4320,10 +4372,21 @@
     endKo();
     if (battle.wake) battle.wake();
   });
-  $("#btn-speed").addEventListener("click", (e) => {
-    battle.speed = battle.speed === 1 ? 0.45 : 1;
-    e.target.textContent = battle.speed === 1 ? "速度:ふつう" : "速度:はやい";
+  // v1.8.1:速度は ふつう → はやい → おそい の3つ。おそい = v1.8.0 の戦闘アニメの速さ(1秒に38コマ。ふつうは49コマ)。選んだ速度は覚えておく
+  const SPEEDS = [{ v: 1, label: "ふつう" }, { v: 0.45, label: "はやい" }, { v: 49 / 38, label: "おそい" }];
+  const SPEED_KEY = "arenaBattle.speed";
+  function speedRender() {
+    const sp = SPEEDS.find((x) => x.v === battle.speed) || SPEEDS[0];
+    $("#btn-speed").textContent = `速度:${sp.label}`;
     if (BA) BA.setSpeed(battle.speed); // v1.8.0
+  }
+  try { const v = Number(global.localStorage.getItem(SPEED_KEY)); if (SPEEDS.some((x) => x.v === v)) battle.speed = v; } catch (e) { /* ふつうのまま */ }
+  speedRender();
+  $("#btn-speed").addEventListener("click", () => {
+    const i = SPEEDS.findIndex((x) => x.v === battle.speed);
+    battle.speed = SPEEDS[(i + 1) % SPEEDS.length].v;
+    try { global.localStorage.setItem(SPEED_KEY, String(battle.speed)); } catch (e) { /* 保存できなくても動く */ }
+    speedRender();
   });
   // もう一度:同じキャラ・武器で、バイオリズムと先攻は引き直し。スキルは引き直し or そのまま
   function rematch(keepSkills) {

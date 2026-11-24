@@ -55,7 +55,7 @@
       "exclusiveOwner": "獅子(除外)"
     },
     {
-      "name": "くちばし(タカ)",
+      "name": "鉤爪(タカ)",
       "weaponLv": null,
       "price": null,
       "might": 7,
@@ -72,7 +72,7 @@
       "exclusive": false
     },
     {
-      "name": "くちばし(ティバーン)",
+      "name": "鉤爪(ティバーン)",
       "weaponLv": null,
       "price": null,
       "might": 8,

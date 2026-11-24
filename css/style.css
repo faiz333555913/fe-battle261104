@@ -142,9 +142,6 @@ button, input, select { font: inherit; color: inherit; }
   50% { filter: drop-shadow(0 0 10px rgba(255, 228, 160, .55)) drop-shadow(0 0 26px rgba(216, 183, 90, .32)); }
 }
 @keyframes logo-shine { 0%, 62% { background-position: 100% 0, 0 0; } 92%, 100% { background-position: 0% 0, 0 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .title-heading { animation: none; filter: drop-shadow(0 0 8px rgba(255, 228, 160, .4)); }
-}
 .title-menu { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .title-menu .btn { width: 240px; font-size: 1.05rem; }
 
@@ -733,9 +730,6 @@ tr.capped .statbar > div { background: linear-gradient(90deg, #c7952d, var(--gol
   box-shadow: 0 0 6px rgba(185, 238, 58, .6);
 }
 @keyframes capshine { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .stat.capped .stat-bar i, tr.capped .statbar > div { animation: none; }
-}
 .fighter-head .char-name { flex-wrap: nowrap; white-space: nowrap; }
 .fighter-head .char-title { min-width: 9em; }
 .head-bio .bio svg { width: 84px; height: auto; }
@@ -933,9 +927,6 @@ button, .btn, .choice, .link-btn { touch-action: manipulation; -webkit-tap-highl
 @keyframes txtup { 0%, 55% { color: #7dee9e; } }
 @keyframes txtdown { 0%, 55% { color: #ff8b8f; } }
 
-@media (prefers-reduced-motion: reduce) {
-  .x2 i, .fighter.transformed::before, .fighter.transformed .gauge-fill { animation: none; }
-}
 @media (max-width: 600px) {
   .fx-skill { font-size: 1.6rem; }
   .fx-skill small { font-size: .72rem; letter-spacing: .3em; }
@@ -1029,9 +1020,6 @@ button, .btn, .choice, .link-btn { touch-action: manipulation; -webkit-tap-highl
 .arena.ss-dim .fighter { filter: grayscale(.6) brightness(.45) sepia(1) hue-rotate(-40deg) saturate(3); }
 .fx-ko.ss { color: #fff; text-shadow: 0 0 2px #000, 0 5px 0 #000, 0 0 30px #ff1a1a, 0 0 60px #8a0000; letter-spacing: .12em; }
 
-@media (prefers-reduced-motion: reduce) {
-  .fighter.raging::after, .skill-chip.rare, .roulette-slot.rare .r-skill { animation: none; }
-}
 @media (max-width: 600px) {
   .fx-shunsatsu b { font-size: 2.6rem; }
   .fx-skill.rare { font-size: 1.9rem; }
@@ -1321,10 +1309,6 @@ body:has(#screen-title.active) .title-bg { opacity: 1; }
   /* v1.4.0:「タイトルへ戻る」は上の中央(左右のキャラ情報に重ならない位置) */
   .topbar .link-btn { right: auto; left: 50%; top: 1px; transform: translateX(-50%); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .tb-glow, .tb-sparks i, .press-start { animation: none; }
-  .title-menu.enter .btn { animation: none; opacity: 1; }
-}
 
 /* =================== v1.4.3 =================== */
 /* キャラ作成:ランダムのボタン2つ */
@@ -1405,9 +1389,6 @@ body:has(#screen-title.active) .title-bg { opacity: 1; }
 .fighter.hit { animation: shake .35s ease, hitflash .4s ease; }
 @keyframes hitflash { 0%, 100% { box-shadow: inset 0 0 0 999px rgba(200, 40, 40, 0); } 25% { box-shadow: inset 0 0 0 999px rgba(200, 40, 40, .38), 0 0 18px rgba(229, 72, 77, .6); } }
 
-@media (prefers-reduced-motion: reduce) {
-  .turn-tag { animation: none; transform: translate(-50%, 0); }
-}
 @media (max-width: 960px) {
   .round-label { font-size: 1rem; }
 }
@@ -1558,9 +1539,6 @@ table.stats .gbonus.zero { color: var(--muted); font-weight: normal; }
   .howto-sec { padding: 10px 12px; line-height: 1.55; }
   .float.big-heal { font-size: 1.6rem; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .heal-burst { display: none; }
-}
 table.stats thead th.r { text-align: right; }
 /* v1.4.5:スキルの下の空き。キャラ枠の最低の高さ(620px)をやめ、中身の高さに合わせる(左右の高さはそろったまま) */
 #screen-battle .fighter { min-height: 0; }
@@ -1598,9 +1576,6 @@ table.stats thead th { white-space: nowrap; }
 @media (orientation: landscape) and (max-height: 500px) {
   .mode-menu { gap: 8px; }
   .mode-menu .mode-btn { padding: 6px 18px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .mode-menu.enter .btn { animation: none; opacity: 1; }
 }
 
 /* 武器スキル:右上の「武器」の札をなくしたので、右の余白も戻す */
@@ -1651,7 +1626,6 @@ table.stats thead th { white-space: nowrap; }
   .fx-revert small { font-size: .7rem; letter-spacing: .3em; }
   .fx-revert em { font-size: .65rem; }
 }
-@media (prefers-reduced-motion: reduce) { .revert-shards { display: none; } }
 
 /* バトル準備:スキル選択(ONのとき、抽選のスイッチは薄く) */
 .fx-toggle.off { opacity: .4; cursor: default; }
@@ -1775,9 +1749,6 @@ table.stats thead th { white-space: nowrap; }
   /* スマホ横画面:タイトルのメニューと同じ2列×2段 */
   #screen-title[data-stage="mode"] .mode-menu { display: grid; grid-template-columns: repeat(2, auto); justify-content: center; gap: 10px 14px; }
   .mode-menu .mode-btn, .mode-menu .mode-back { width: 220px; margin-top: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .mode-menu.enter .btn { animation: none; opacity: 1; }
 }
 
 /* アーケード達成の★(名前の横) */
@@ -1903,10 +1874,6 @@ table.stats thead th { white-space: nowrap; }
   .talk-text { font-size: .92rem; line-height: 1.55; }
   .roulette-choice-text { margin-top: 6px; font-size: .85rem; }
   .roulette-choice { margin-top: 6px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .talk-text.in, .talk-banner b, .talk-banner small, .talk-banner em, .talk-next { animation: none; }
-  .talk-dark { transition: none; }
 }
 #as-mode .bo-btn { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
 .overlay.talk[hidden] { display: none; }
@@ -2039,9 +2006,6 @@ table.stats thead th { white-space: nowrap; }
 .sun-burst .sb-p { position: absolute; bottom: 10%; width: 6px; height: 6px; border-radius: 50%; background: #fff3a0; box-shadow: 0 0 8px #ffd84a; opacity: 0; animation: ob-rise 1.1s ease-out forwards; }
 @keyframes sb-ring { 0% { opacity: 1; transform: scale(.3); } 100% { opacity: 0; transform: scale(7); } }
 .float.big-heal.sun { color: #fff0a0; text-shadow: 0 2px 0 #5a3a00, 0 0 16px rgba(255, 210, 60, .95); }
-@media (prefers-reduced-motion: reduce) {
-  .ougi-bg .ob-star, .ougi-bg .ob-sunrays, .ougi-bg .ob-spark, .ougi-bg .ob-ray, .ougi-bg .ob-pillar { animation: none; }
-}
 @media (max-width: 600px), (orientation: landscape) and (max-height: 500px) {
   .ougi-bg.luna .ob-moon, .ougi-bg.sol .ob-sun, .ougi-bg.aether .ob-emblem { width: 80px; height: 80px; margin-left: -40px; }
   .fighter.leap, .fighter.hover { transform: translateY(-16px); }
@@ -2389,6 +2353,8 @@ button.tt-card.rest:disabled { cursor: not-allowed; }
 .as-rules li.tt-rule-more { font-size: .9em; color: var(--muted); list-style: none; }
 .howto-ul li.howto-more { font-size: .9em; color: var(--muted); }
 
+/* v1.8.1:端末の「視差効果を減らす」(prefers-reduced-motion)で演出を止めていたのをやめた(iPhone でタイトルの演出が出なかった原因) */
+
 /* ================= v1.8.0:戦闘アニメ ================= */
 /* 設定で「戦闘アニメ」をONにしたとき、キャラ枠の上にドット絵の戦闘アニメ(256×168ドットを拡大)を重ねる。
    ROUND・スキルの帯・K.O. などの文字(.arena-fx、z-index 20)はアニメの上に出る */
@@ -2422,8 +2388,31 @@ body:has(#screen-title.active) { background: transparent; }
 .title-box { padding-top: 6vh; }
 .title-sub { text-shadow: 0 1px 4px rgba(0, 0, 0, .8); }
 .title-box .version, .press-start { text-shadow: 0 1px 3px rgba(0, 0, 0, .9), 0 0 10px rgba(0, 0, 0, .7); }
-@media (prefers-reduced-motion: reduce) { .tb-torch { animation: none; } .title-emblem { animation: none; } }
 @media (max-height: 500px) and (orientation: landscape) {
   .title-emblem { height: 40px; margin-bottom: 0; }
   .title-box { padding-top: 0; }
+}
+
+/* =========================================================
+   v1.8.1:スマホの「タイトルへ戻る」
+   ========================================================= */
+/* 半透明で、下の画面が透けて靄がかかったように見え、ボタンだと分かりづらかった → 透けない地・金の枠・太字・◀ */
+@media (orientation: landscape) and (max-height: 500px), (orientation: portrait) and (max-width: 600px) {
+  .topbar #nav-home { background: #1b2546; border: 1px solid var(--gold); color: #ffe7a0; font-weight: bold; letter-spacing: .05em;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .7); backdrop-filter: none; opacity: 1; }
+  .topbar #nav-home::before { content: "◀ "; font-size: .85em; }
+}
+
+/* =========================================================
+   v1.8.1:戦闘アニメの画面を少し大きく
+   ========================================================= */
+/* アニメの外側に、OFFのときの演出(キャラ枠の上の「先攻・後攻」の札、ダメージの赤い光など)がはみ出して見えていた。
+   アニメの枠をキャラ枠より少し大きくし(上は先攻・後攻の札の高さぶん)、アニメの下のキャラ枠とまん中の文字は見えなくする */
+.arena .ba-wrap { inset: -30px -6px -6px; }
+.arena.ba-on > .fighter, .arena.ba-on > .arena-mid { visibility: hidden; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .arena .ba-wrap { inset: -14px -4px -4px; }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .arena .ba-wrap { inset: -16px -4px -4px; }
 }

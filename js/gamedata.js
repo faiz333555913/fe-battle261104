@@ -4341,7 +4341,7 @@ window.GAME_DATA = {
     "tribe": "鳥翼族",
     "gender": "共用",
     "moveType": "飛行",
-    "weapon": "くちばし(タカ)",
+    "weapon": "鉤爪(タカ)",
     "effectivenessTags": [
      "鳥翼族",
      "飛行系"
@@ -4464,7 +4464,7 @@ window.GAME_DATA = {
      "exclusiveOwner": "獅子(除外)"
     },
     {
-     "name": "くちばし(タカ)",
+     "name": "鉤爪(タカ)",
      "weaponLv": null,
      "price": null,
      "might": 7,
@@ -4481,7 +4481,7 @@ window.GAME_DATA = {
      "exclusive": false
     },
     {
-     "name": "くちばし(ティバーン)",
+     "name": "鉤爪(ティバーン)",
      "weaponLv": null,
      "price": null,
      "might": 8,

@@ -1,7 +1,7 @@
 // v1.8.0:戦闘アニメ(設定で「戦闘アニメ」をONにしたときだけ使う)。
 // 中身は「戦闘アニメ サンプル8」(samples/battle_anim/v8_weapons/tools/template.html)のアニメをそのまま持ってきて、
 // ゲームの結果(命中・必殺・ダメージ・回復)どおりに動くようにしたもの。ドット絵は js/battleanim_sprites.js。
-// 内部 256×168 ドット(下の48ドットが名前・HP・ATK/HIT/CRT のパネル)を、キャンバスで拡大して表示する。
+// 内部 256×178 ドット(下の58ドットが名前・クラス/武器・スキル・HP・ATK/HIT/CRT のパネル。v1.8.1 でスキルの行を足して 168→178)を、キャンバスで拡大して表示する。
 // 使い方は main.js の「v1.8.0:戦闘アニメ」。外から使うのは window.BattleAnim(このファイルの最後)。
 (function (global) {
 'use strict';
@@ -18,7 +18,7 @@ function decodeSprites(src) {
 const SPR = decodeSprites(global.BATTLE_ANIM_SPRITES || {});
 
 /* ===== 基本設定 ===== */
-const W = 256, H = 168, S = 3, FLOOR = 106;
+const W = 256, H = 178, S = 3, FLOOR = 106;
 const cv = document.createElement('canvas'); cv.className = 'ba-canvas';
 cv.width = W * S; cv.height = H * S;
 const ctx = cv.getContext('2d');
@@ -377,15 +377,19 @@ function txt(str, x, y, size, color, align = 'left', maxW) {
   ctx.fillStyle = color; ctx.fillText(str, x * S, y * S, mw);
 }
 function panel(u, x0) {
-  R(x0, 120, 128, 48, '#0e1636');
-  R(x0, 120, 128, 1, '#d8cca0'); R(x0, 167, 128, 1, '#d8cca0'); R(x0, 120, 1, 48, '#d8cca0'); R(x0 + 127, 120, 1, 48, '#d8cca0');
-  R(x0 + 2, 122, 124, 1, u.accent); R(x0 + 2, 165, 124, 1, u.accent);
+  // v1.8.1:パネルを10ドット高くして、クラス/武器の下にスキルを出す(HPの行は下へ)
+  const PB = H - 1;
+  R(x0, 120, 128, H - 120, '#0e1636');
+  R(x0, 120, 128, 1, '#d8cca0'); R(x0, PB, 128, 1, '#d8cca0'); R(x0, 120, 1, H - 120, '#d8cca0'); R(x0 + 127, 120, 1, H - 120, '#d8cca0');
+  R(x0 + 2, 122, 124, 1, u.accent); R(x0 + 2, PB - 2, 124, 1, u.accent);
   txt(u.name, x0 + 6, 132, 8, '#ffffff', 'left', 84);
   txt(`${u.cls}／${u.wpn}`, x0 + 6, 142, 6, '#b8c4ff', 'left', 84);
-  txt('HP', x0 + 6, 160, 7, '#f0d060');
+  if (u.skills && u.skills.length) txt(u.skills.join('・'), x0 + 6, 151, 6, '#ffe08a', 'left', 116);
+  const hy = 170;
+  txt('HP', x0 + 6, hy, 7, '#f0d060');
   const pop = u.hpPop > 0 ? u.hpPop : 0, red = (u.hpRed || 0) / 16;
-  txt(String(Math.max(0, u.disp)), x0 + 23, 160 + Math.round(pop * 0.25), 9 + pop * 0.5, red > 0 ? mixHex('#ffffff', '#ff3a30', Math.min(1, red * 1.5)) : '#ffffff', 'center');
-  const gx = x0 + 32, gy = 153;
+  txt(String(Math.max(0, u.disp)), x0 + 23, hy + Math.round(pop * 0.25), 9 + pop * 0.5, red > 0 ? mixHex('#ffffff', '#ff3a30', Math.min(1, red * 1.5)) : '#ffffff', 'center');
+  const gx = x0 + 32, gy = hy - 7;
   // v1.8.0:HPが60より多いときは、1目盛りを2以上にして2段に収める
   const per = Math.max(1, Math.ceil(u.max / 60)), ticks = Math.ceil(u.max / per);
   const dispT = Math.ceil(u.disp / per), hpT = Math.ceil(u.hp / per);
@@ -400,10 +404,11 @@ function panel(u, x0) {
     if (nxt) { const g3 = on && on2 ? (lost || lost2 ? ['#d87060', '#b83228', '#7a1a14'] : ['#a8d8b4', '#4ea870', '#2e7a4e']) : ['#241e1e', '#2e2424', '#2e2424'];
       for (let k = 0; k < 3; k++) R(bx + 1, by + k, 1, 1, g3[k]); }
   }
-  // 威力・命中・必殺は英大文字3文字で（ATK・HIT・CRT）
+  // 威力・命中・必殺は英大文字3文字で（ATK・HIT・CRT）。v1.8.1:2回以上攻撃できるときは ATK の数字の左に「×2」など
   [['ATK', u.st.dmg], ['HIT', u.st.hit], ['CRT', u.st.crt]].forEach(([k, v], i) => {
     txt(k, x0 + 94, 133 + i * 11, 6, '#9ab0e8'); txt(String(v), x0 + 123, 133 + i * 11, 6, '#ffffff', 'right');
   });
+  if (u.st.times > 1) txt(`×${u.st.times}`, x0 + 93, 133, 6, '#ffd040', 'right');
 }
 function drawHUD() { panel(units.s, 0); panel(units.a, 128); }
 
@@ -448,7 +453,12 @@ async function resolve0(a, d, o, impX, impY) {
   }
   if (o.hit) {
     const dmg = rec ? rec.damage : (o.crit ? o.dmg * 3 : o.dmg);
+    const hpBefore = d.hp;
     d.hp = rec ? Math.max(0, rec.hpAfter) : Math.max(0, d.hp - dmg);
+    // v1.8.1:HPが0になった瞬間にスローにして、ゲームに知らせる(K.O. の文字を出す)。動きはそのまま続く
+    //   (HPの数字は少しずつ減るので、表示が0になったとき。step の koWatch)
+    //   とどめはHPの数字を必殺と同じように一気に減らす(倒れて消える前に K.O. を出すため)
+    if (hpBefore > 0 && d.hp <= 0 && !fast) { koWatch = d; d.hpFast = true; }
     d.pose = 'hurt'; d.flash = o.crit ? 18 : 10;
     spark(impX, impY, o.crit);
     shake = o.shake || (o.crit ? 18 : 7); shakeAmp = o.amp || (o.crit ? 3 : 1);
@@ -3029,10 +3039,21 @@ function moveFor(id, weaponName, category) {
 }
 
 let wrap = null, running = false, speed = 1, acc = 0, lastSetup = null, maxSteps = 6;
-function step() { if (!units.s || !units.a) return; update(); draw(); const w = waiters; waiters = []; w.forEach((r) => r()); }
+function step() {
+  if (!units.s || !units.a) return; update();
+  // v1.8.1:HPの表示が0になった瞬間:スローにして K.O.(ゲームに知らせる)
+  if (koWatch && koWatch.disp <= 0) {
+    const side = koWatch === units.s ? 'left' : 'right'; koWatch = null; slowKo = KO_SLOW_STEPS; koExtra = 60;
+    if (onKo) { try { onKo(side); } catch (e) { /* 演出だけ */ } }
+  }
+  draw(); const w = waiters; waiters = []; w.forEach((r) => r()); }
 // v1.8.0:時間で進める(画面のリフレッシュレートが 120Hz などでも同じ速さ)。
 // サンプルは 1秒に60コマだったが、ガトー「早すぎる」で ふつう=1秒に STEPS_PER_SEC コマ
-const STEPS_PER_SEC = 38;
+// v1.8.1:ガトー「前々回(60)と前回(38)の中間」→ 49。前回の速さは「速度:おそい」(main.js の battle.speed = 49/38)
+const STEPS_PER_SEC = 49;
+// v1.8.1:とどめのスロー。HPが0になってから KO_SLOW_STEPS コマのあいだ、KO_SLOW 倍ゆっくり(倒れたキャラが消えるまで)
+const KO_SLOW = 2.2, KO_SLOW_STEPS = 64;
+let slowKo = 0, onKo = null, koExtra = 60, koWatch = null;
 let lastT = 0;
 function loop(t) {
   if (!running) return;
@@ -3040,16 +3061,20 @@ function loop(t) {
   const dt = lastT ? Math.min(0.1, Math.max(0, (now - lastT) / 1000)) : 0;
   lastT = now;
   if (!fast) {
-    acc += dt * STEPS_PER_SEC / (speed || 1);
+    acc += dt * STEPS_PER_SEC / (speed || 1) / (slowKo > 0 ? KO_SLOW : 1);
     let n = Math.min(maxSteps, Math.floor(acc));
     acc -= n;
-    while (n-- > 0) step();
+    while (n-- > 0) {
+      step();
+      // 倒れたキャラが消えきるまではスローのまま(長くても KO_SLOW_STEPS + 60 コマ)
+      if (slowKo > 0) { const gone = [units.s, units.a].some((u) => u && u.hp <= 0 && u.alpha > 0); slowKo = gone && slowKo === 1 && koExtra-- > 0 ? 1 : slowKo - 1; }
+    }
   }
   global.requestAnimationFrame(loop);
 }
 // 待っているコルーチンを、絵を出さずに最後まで進める
 function flush() {
-  fast = true;
+  fast = true; slowKo = 0; koWatch = null;
   for (let i = 0; i < 50 && waiters.length; i++) { const w = waiters; waiters = []; w.forEach((r) => r()); }
 }
 function mount(container) {
@@ -3073,7 +3098,8 @@ function applyInfo(u, p) {
   u.name = p.name; u.cls = p.cls; u.wpn = p.wpn;
   u.max = Math.max(1, p.max || 1);
   u.hp = Math.max(0, Math.min(u.max, p.hp)); u.disp = u.hp; u.hpFast = false; u.hpRed = 0; u.hpPop = 0;
-  if (p.st) u.st = { dmg: p.st.dmg, hit: p.st.hit, crt: p.st.crt };
+  if (p.st) u.st = { dmg: p.st.dmg, hit: p.st.hit, crt: p.st.crt, times: p.st.times || 1 };
+  u.skills = (p.skills || []).slice();
   u.move = p.move || null;
   applyColor(u, p.color);
 }
@@ -3113,8 +3139,11 @@ function setHp(side, hp, max) {
 }
 function setStats(side, st) {
   if (!sideReady() || !st) return;
-  unitOf(side).st = { dmg: st.dmg, hit: st.hit, crt: st.crt };
+  const u = unitOf(side);
+  u.st = { dmg: st.dmg, hit: st.hit, crt: st.crt, times: st.times != null ? st.times : (u.st && u.st.times) || 1 };
 }
+// v1.8.1:パネルに出すスキル(キャラ枠に見えているスキル)
+function setSkills(side, list) { if (sideReady()) unitOf(side).skills = (list || []).slice(); }
 function popAt(side, str, color, size = 9) {
   if (!sideReady()) return;
   const u = unitOf(side);
@@ -3133,6 +3162,12 @@ async function attack(side, plan) {
   const mv = a.move && !isBeast(a) ? moveFor(a.kind, a.wpn, a.move.category) : null;
   const one = async (first, allowTwo) => {
     const o = { hit: first.hit, crit: first.crit, q, dmg: first.damage || 0 };
+    // v1.8.1:『疾風の刃』は、どの職業でもウインドの動き(風をためて、風の刃を飛ばす)
+    if (plan.wind) {
+      if (first.crit) await cutIn(a, 'cast', { title: '必殺の一撃', sub: '疾風の刃' });
+      await spellAttack(a, d, Object.assign(o, { sp: 'wind' }));
+      return;
+    }
     if (plan.ougi) {
       o.crit = false;
       await ougiAct(a, d, plan.ougi, o);
@@ -3149,10 +3184,12 @@ async function attack(side, plan) {
     await act(a, d, o);
   };
   await one(q[0], true);
-  plan = Object.assign({}, plan, { ougi: null });
+  plan = Object.assign({}, plan, { ougi: null, wind: false });
   // まだ残っている攻撃(追撃のない職業の2回目など)は、もう一度ふつうに攻撃する
   for (let i = 0; i < 4 && q.length && d.hp > 0; i++) await one(q[0], true);
   a.healQ = null;
+  // v1.8.1:HPの表示が0になる前に動きが終わったときは、ここで K.O.
+  if (koWatch) { koWatch.disp = 0; const side = koWatch === units.s ? 'left' : 'right'; koWatch = null; if (onKo) { try { onKo(side); } catch (e) { /* 演出だけ */ } } }
   if (plan.hpEnd) { setHp('left', plan.hpEnd.left); setHp('right', plan.hpEnd.right); }
   a.pose = 'idle'; a.front = false; a.dir = side === 'left' ? 1 : -1;
   if (d.hp > 0) { d.pose = 'idle'; d.dir = -a.dir; d.x = d.home; d.alpha = 1; }
@@ -3213,8 +3250,10 @@ function sleep(side, on) { if (sideReady()) unitOf(side).sleep = on ? 9999 : 0; 
 function glow(side, n = 40) { if (sideReady()) unitOf(side).glow = n; }
 
 global.BattleAnim = {
-  mount, unmount, setup, setHp, setStats, attack, ougiSelf, transform, ko, hurt, heal, sleep, glow, popAt,
+  mount, unmount, setup, setHp, setStats, setSkills, attack,
+  ougiSelf, transform, ko, hurt, heal, sleep, glow, popAt,
   flush, spriteFor, moveFor,
+  onKo: (f) => { onKo = f || null; }, // v1.8.1:HPが0になった瞬間に呼ぶ(side)
   setSpeed: (s) => { speed = s || 1; },
   isFast: () => fast,
   // テスト用
