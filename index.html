@@ -11,16 +11,26 @@
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <title>闘技場バトル</title>
 <!-- v1.8.0:css・js に ?v=版 をつける(GitHub Pages で前の版の main.js などがキャッシュに残り、新しい機能が動かないのを防ぐ。版を上げたら一緒に変える) -->
-<link rel="stylesheet" href="css/style.css?v=1.8.1">
+<link rel="stylesheet" href="css/style.css?v=1.8.2">
 <!-- v1.6.6:スマホ縦向きのバトル準備・バトル(portrait_auto.css は tools/build_portrait_css.py が作る) -->
-<link rel="stylesheet" href="css/portrait_auto.css?v=1.8.1">
-<link rel="stylesheet" href="css/portrait.css?v=1.8.1">
+<link rel="stylesheet" href="css/portrait_auto.css?v=1.8.2">
+<link rel="stylesheet" href="css/portrait.css?v=1.8.2">
 </head>
 <body>
 
   <header class="topbar">
     <button type="button" class="link-btn" data-goto="title" id="nav-home" hidden>タイトルへ戻る</button>
   </header>
+  <!-- v1.8.2:アーケードの3on3で、自分の3人のステータスを見るボタン(「タイトルへ戻る」の右。選ぶ画面の上にも出る) -->
+  <button type="button" class="link-btn arcstats-btn" id="nav-arcstats" hidden>3人のステータス</button>
+  <div id="arc-stats" class="overlay arc-stats" hidden>
+    <div class="arc-stats-box" role="dialog" aria-labelledby="arc-stats-title">
+      <p class="tt-title" id="arc-stats-title">自分のチーム</p>
+      <p class="tt-sub">アーケードの中だけのレベル・能力値(HPは最大HP)</p>
+      <div class="arc-team-me" id="arc-stats-body"></div>
+      <div class="card-actions"><button type="button" class="btn btn-main" id="arc-stats-close">閉じる</button></div>
+    </div>
+  </div>
 
   <main id="app">
 
@@ -28,11 +38,13 @@
     <!-- v1.4.0:最初は Press click(v1.4.1で名前変更)→ 押すと点滅と同時に暗転 → メニューがスライドして出てくる -->
     <section id="screen-title" class="screen active" data-stage="press">
       <div class="title-box">
-        <!-- v1.8.0:タイトルの紋章(ガトーの素材。マゼンタを抜いた) -->
-        <img class="title-emblem" src="assets/title_emblem.png" alt="" width="512" height="344">
         <p class="title-sub">― 名前に宿る力で戦え ―</p>
-        <h1 class="title-heading">闘技場バトル</h1>
-        <p class="version">v1.8.1</p>
+        <!-- v1.8.2:紋章(ガトーの素材。v1.8.0)はロゴの後ろに重ねる -->
+        <div class="title-logo">
+          <img class="title-emblem" src="assets/title_emblem.png" alt="" width="512" height="344">
+          <h1 class="title-heading">闘技場バトル</h1>
+          <p class="version">v1.8.2</p>
+        </div>
         <button type="button" class="press-start" id="press-start">Press click</button>
         <nav class="title-menu">
           <button type="button" class="btn btn-main slide-l" data-goto="create">キャラ作成</button>
@@ -294,7 +306,7 @@
           <h3>ラグズと化身</h3>
           <ul class="howto-ul">
             <li>ラグズは<b>化身前</b>で始まります。化身前は爪・くちばし・ブレスの威力が0です。</li>
-            <li><b>化身ゲージ</b>が20になると、その場で化身して大きく強くなります。初期値は幸運(タカ+6・カラス+8・猫+4・虎+2)。</li>
+            <li><b>化身ゲージ</b>が20になると、その場で化身して大きく強くなります。初期値は幸運(タカ+6・カラス+8・猫+6・虎+2)。</li>
             <li>化身前はラウンドごとに+4、ダメージを受けるたびに+3、攻撃が当たるたびに+1。化身中はラウンドの終わりに-5され、0で化身が解けます(また溜まります)。</li>
             <li>弓・風魔法は鳥(タカ・カラス)に、炎魔法は獣牙族(猫・虎)に、ラグズ○○などの武器はラグズに特効です。</li>
           </ul>
@@ -625,21 +637,21 @@
     <button type="button" class="btn btn-small talk-skip" id="talk-skip" hidden>会話をスキップ ▶▶</button>
   </div>
 
-  <script src="js/gamedata.js?v=1.8.1"></script>
-  <script src="js/config.js?v=1.8.1"></script>
-  <script src="js/rng.js?v=1.8.1"></script>
-  <script src="js/gamedb.js?v=1.8.1"></script>
-  <script src="js/generator.js?v=1.8.1"></script>
-  <script src="js/randomchar.js?v=1.8.1"></script>
-  <script src="js/battle.js?v=1.8.1"></script>
-  <script src="js/tournament.js?v=1.8.1"></script>
-  <script src="js/arcade.js?v=1.8.1"></script>
-  <script src="js/teambattle.js?v=1.8.1"></script>
-  <script src="js/storage.js?v=1.8.1"></script>
-  <script src="js/ui.js?v=1.8.1"></script>
+  <script src="js/gamedata.js?v=1.8.2"></script>
+  <script src="js/config.js?v=1.8.2"></script>
+  <script src="js/rng.js?v=1.8.2"></script>
+  <script src="js/gamedb.js?v=1.8.2"></script>
+  <script src="js/generator.js?v=1.8.2"></script>
+  <script src="js/randomchar.js?v=1.8.2"></script>
+  <script src="js/battle.js?v=1.8.2"></script>
+  <script src="js/tournament.js?v=1.8.2"></script>
+  <script src="js/arcade.js?v=1.8.2"></script>
+  <script src="js/teambattle.js?v=1.8.2"></script>
+  <script src="js/storage.js?v=1.8.2"></script>
+  <script src="js/ui.js?v=1.8.2"></script>
   <!-- v1.8.0:戦闘アニメ(ドット絵と動き) -->
-  <script src="js/battleanim_sprites.js?v=1.8.1"></script>
-  <script src="js/battleanim.js?v=1.8.1"></script>
-  <script src="js/main.js?v=1.8.1"></script>
+  <script src="js/battleanim_sprites.js?v=1.8.2"></script>
+  <script src="js/battleanim.js?v=1.8.2"></script>
+  <script src="js/main.js?v=1.8.2"></script>
 </body>
 </html>

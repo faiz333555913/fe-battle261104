@@ -153,7 +153,7 @@ function drawSprite(u, x, y, alpha, opt = {}) {
 }
 function drawUnit(u, x, alpha, ghost) {
   if (alpha <= 0) return;
-  drawSprite(u, x, FLOOR + u.dy, alpha, { ghost, tint: ghost ? u.tint : null });
+  drawSprite(u, x, FLOOR + u.dy + (u.land || 0), alpha, { ghost, tint: ghost ? u.tint : null });
 }
 
 
@@ -204,6 +204,29 @@ let flashA = 0, shake = 0, shakeAmp = 0, hShake = 0, darkA = 0, darkTarget = 0, 
 function addPx(x, y, life, colors, vx = 0, vy = 0, size = 1, grav = 0) { fx.push({ x, y, life, max: life, colors, vx, vy, size, grav }); }
 const HOT = ['#ffffff', '#fff2a0', '#ffc040', '#ff7a30', '#c03a20'];
 const COOL = ['#ffffff', '#d8f4ff', '#88c8ff', '#4878d8', '#283c90'];
+// v1.8.2:倒れたキャラが消えるときのアワ。前はキャラのまん中の細い範囲(横16・高さ34ドット)だけだったのを、
+//         キャラの絵の大きさ(騎馬・飛行・化身も)いっぱいに、たくさん出して、ゆらゆら上っていく
+const _boxCache = {};
+function bodyBox(u) {
+  const key = u.kind;
+  if (!_boxCache[key]) {
+    const sp = SPR[u.kind], g = sp.frames[poseOf(sp, sp.frames.fly1 ? 'fly1' : 'idle')];
+    let l = 1e9, r = -1e9, t = 1e9;
+    g.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== '.') { l = Math.min(l, x); r = Math.max(r, x); t = Math.min(t, y); } });
+    _boxCache[key] = l > r ? { l: -8, r: 8, h: 34 } : { l: l - sp.foot[0], r: r - sp.foot[0], h: Math.max(16, sp.foot[1] - t) };
+  }
+  return _boxCache[key];
+}
+function koBubbles(d, i) {
+  const b = bodyBox(d), n = i < 30 ? 3 : 1;
+  for (let k = 0; k < n; k++) {
+    const ox = b.l + Math.random() * (b.r - b.l), x = d.x + (d.dir < 0 ? -ox : ox);
+    const y = FLOOR + d.dy - Math.random() * b.h;
+    const big = Math.random() < 0.35;
+    fx.push({ x, y, life: 26 + (Math.random() * 18 | 0), max: 44, colors: COOL, vx: (Math.random() - 0.5) * 0.5, vy: -0.25 - Math.random() * 0.35,
+      size: big ? 4 : 3, grav: -0.025, bubble: true });
+  }
+}
 const DUST = ['#f0dcb0', '#d8bc88', '#b89a68', '#8c7050'];
 const ROCK = ['#a08060', '#a08060', '#806448', '#5e4a36'];
 
@@ -266,9 +289,11 @@ function update() {
     // HPの数字：減るたびに一瞬大きくなって赤くなる（減っているあいだは赤のまま、止まると白へ戻る）
     if (u.hpPop > 0) u.hpPop--;
     if (u.disp > u.hp && u.hpFast) { u.hpRed = 16; u.disp = Math.max(u.hp, u.disp - Math.max(1, Math.ceil((u.disp - u.hp) / 5))); u.hpPop = 8; if (u.disp === u.hp) u.hpFast = false; }
-    else if (u.disp > u.hp) { u.hpRed = 16; if (T % 3 === 0) { u.disp--; u.hpPop = u.hpPop > 0 ? 5 : 8; } }
+    // v1.8.2:ふつうの減り方を少し速く(3コマに1 → 2コマに1。差が大きいときは1コマに1)。数字もバーも同じ u.disp なのでそろって減る
+    else if (u.disp > u.hp) { u.hpRed = 16; if (T % 2 === 0 || u.disp - u.hp > 12) { u.disp--; u.hpPop = u.hpPop > 0 ? 5 : 8; } }
     else if (u.hpRed > 0) u.hpRed--;
     u.ghosts.forEach(g => g.a -= 0.05); u.ghosts = u.ghosts.filter(g => g.a > 0);
+    landStep(u);
     if (u.pose !== u._lp) { u.prevPose = u._lp; u._lp = u.pose; }        // ひとつ前のポーズ（奥義の連撃で使う）
     if (u.sleep > 0) { u.sleep--; if (u.sleep % 18 === 0) popText('Z', u.x + 8 - (u.sleep % 36 ? 0 : 4), FLOOR + u.dy - 40, '#c8d8ff', 8); }
   }
@@ -315,6 +340,14 @@ function draw() {
   for (const f of projs) f();
   for (const p of fx) {
     const k = Math.min(p.colors.length - 1, Math.floor((1 - p.life / p.max) * p.colors.length));
+    if (p.bubble) {
+      // アワ:ふちだけの丸(角を抜いた四角)+光るところ
+      const x = Math.round(p.x + Math.sin((p.life + p.y) * 0.3) * 0.8), y = Math.round(p.y), s = p.size, c = p.colors[k];
+      ctx.globalAlpha = Math.min(1, p.life / 10);
+      R(x + 1, y, s - 2, 1, c); R(x + 1, y + s - 1, s - 2, 1, c); R(x, y + 1, 1, s - 2, c); R(x + s - 1, y + 1, 1, s - 2, c); R(x + 1, y + 1, 1, 1, '#ffffff');
+      ctx.globalAlpha = 1;
+      continue;
+    }
     R(p.x, p.y, p.size, p.size, p.colors[k]);
   }
   camX = 0; camY = 0;
@@ -480,7 +513,7 @@ async function finish(a, d) {
   if (d.hp <= 0) {
     for (let i = 0; i < 40; i++) {
       d.flash = (i % 6 < 3) ? 2 : 0; d.alpha = 1 - i / 40;
-      if (i % 3 === 0) addPx(d.x + (Math.random() * 16 - 8), FLOOR - Math.random() * 34, 18, COOL, 0, -0.6, 2);
+      koBubbles(d, i);
       await frame();
     }
     d.alpha = 0;
@@ -556,7 +589,7 @@ async function finishSword(a, d) {
   if (d.hp <= 0) {
     for (let i = 0; i < 40; i++) {
       d.flash = (i % 6 < 3) ? 2 : 0; d.alpha = 1 - i / 40;
-      if (i % 3 === 0) addPx(d.x + (Math.random() * 16 - 8), FLOOR - Math.random() * 34, 18, COOL, 0, -0.6, 2);
+      koBubbles(d, i);
       await frame();
     }
     d.alpha = 0;
@@ -1056,7 +1089,7 @@ async function armorFinish(a, d) {
   if (d.hp <= 0) {
     for (let i = 0; i < 40; i++) {
       d.flash = (i % 6 < 3) ? 2 : 0; d.alpha = 1 - i / 40;
-      if (i % 3 === 0) addPx(d.x + (Math.random() * 16 - 8), FLOOR - Math.random() * 34, 18, COOL, 0, -0.6, 2);
+      koBubbles(d, i);
       await frame();
     }
     d.alpha = 0;
@@ -1348,7 +1381,7 @@ async function cavFinish(a, d) {
   if (d.hp <= 0) {
     for (let i = 0; i < 40; i++) {
       d.flash = (i % 6 < 3) ? 2 : 0; d.alpha = 1 - i / 40;
-      if (i % 3 === 0) addPx(d.x + (Math.random() * 16 - 8), FLOOR - Math.random() * 34, 18, COOL, 0, -0.6, 2);
+      koBubbles(d, i);
       await frame();
     }
     d.alpha = 0;
@@ -1630,7 +1663,7 @@ async function flyLanceCrit(a, d, o) {
   if (d.hp <= 0) {
     for (let i = 0; i < 40; i++) {
       d.flash = (i % 6 < 3) ? 2 : 0; d.alpha = 1 - i / 40;
-      if (i % 3 === 0) addPx(d.x + (Math.random() * 16 - 8), FLOOR - Math.random() * 34, 18, COOL, 0, -0.6, 2);
+      koBubbles(d, i);
       await frame();
     }
     d.alpha = 0;
@@ -1746,6 +1779,27 @@ async function shift(u, on) {
   u.pose = 'idle'; u.front = false;
   await wait(8);
 }
+// v1.8.2:ペガサスナイト・ドラゴンナイトは、待っているとき(待機・攻撃を受ける・よける)は地上に降りている。
+//         宙に浮いたままだと、剣士や猫などの攻撃が届かない高さだったため。自分が攻撃するときは飛び上がる(2ドットずつ上下)
+const LAND_POSES = new Set(['idle', 'hurt', 'dodge']);
+const _gapCache = {};
+function groundGap(kind, pose) {
+  const key = kind + ':' + pose;
+  if (_gapCache[key] === undefined) {
+    const sp = SPR[kind], g = sp && sp.frames[poseOf(sp, pose === 'idle' && sp.frames.fly1 ? 'fly1' : pose)];
+    let b = -1;
+    if (g) for (let y = g.length - 1; y >= 0; y--) if (/[^.]/.test(g[y])) { b = y; break; }
+    _gapCache[key] = b < 0 ? 0 : Math.max(0, sp.foot[1] - b - 1);
+  }
+  return _gapCache[key];
+}
+function landStep(u) {
+  const sp = SPR[u.kind];
+  const target = sp && sp.frames.fly1 && LAND_POSES.has(u.pose) && u.dy >= 0 ? groundGap(u.kind, u.pose) : 0;
+  const cur = u.land || 0;
+  u.land = cur < target ? Math.min(target, cur + 2) : Math.max(target, cur - 2);
+  if (fast) u.land = target;
+}
 const isBeast = u => u.beast && u.kind === u.beast;
 // 爪あと：3本の平行な線をななめに引く（big で太く長く）
 async function clawMarks(cx, cy, dir, big, up = false) {
@@ -1786,7 +1840,7 @@ async function laguzFinish(a, d) {
   if (d.hp <= 0) {
     for (let i = 0; i < 40; i++) {
       d.flash = (i % 6 < 3) ? 2 : 0; d.alpha = 1 - i / 40;
-      if (i % 3 === 0) addPx(d.x + (Math.random() * 16 - 8), FLOOR - Math.random() * 34, 18, COOL, 0, -0.6, 2);
+      koBubbles(d, i);
       await frame();
     }
     d.alpha = 0;
@@ -1887,8 +1941,13 @@ async function catFollow(a, d, o) {
   }
 }
 // 必殺（人の姿なら先に化身する）
+// v1.8.2:化身ゲージが溜まっていないのに、必殺で化身してしまっていた(サンプルの「人の姿なら先に化身する」のまま)。
+//         化身はゲームの「化身」のときだけ。人の姿の必殺は、カットインのあと人の姿のまま引っかく
 async function laguzCrit(a, d, o) {
-  if (!isBeast(a)) await shift(a, true);
+  if (!isBeast(a)) {
+    await cutIn(a, 'idle', { title: '必殺の一撃', sub: a.wpn });
+    return laguzAttack(a, d, o);
+  }
   if (kin(a) === 'hawk') return hawkCrit(a, d, o);
   if (kin(a) === 'crow') return crowCrit(a, d, o);
   if (kin(a) === 'rdragon') return dragonCrit(a, d, o);
@@ -1976,7 +2035,7 @@ async function laguzEnd(a, d, back) {
   if (d.hp <= 0) {
     for (let i = 0; i < 40; i++) {
       d.flash = (i % 6 < 3) ? 2 : 0; d.alpha = 1 - i / 40;
-      if (i % 3 === 0) addPx(d.x + (Math.random() * 16 - 8), FLOOR - Math.random() * 34, 18, COOL, 0, -0.6, 2);
+      koBubbles(d, i);
       await frame();
     }
     d.alpha = 0;
@@ -2175,7 +2234,7 @@ const STAR = ['#ffffff', '#c8ffd0', '#70e090', '#30a050'];
 const ZAP = ['#ffffff', '#fffab0', '#f0e040', '#b0a010'];
 const SKY = ['#ffffff', '#d8f4ff', '#8ad8ff', '#3a98d8'];
 const SOIL = ['#f0dca0', '#c8a060', '#8a6438', '#5a3e20'];
-const midY = u => FLOOR + u.dy - 20;   // 体のまん中の高さ（飛んでいれば上）
+const midY = u => FLOOR + u.dy + (u.land || 0) - 20;   // 体のまん中の高さ（飛んでいれば上）
 
 // アリーナ全体に重ねる背景
 function drawOugiBg() {
@@ -2444,7 +2503,7 @@ const _topCache = {};
 function chestY(u) {
   const k = u.kind + ':' + u.pose;
   if (_topCache[u.kind] === undefined) { const sp = SPR[u.kind], g = sp.frames[poseOf(sp, 'idle')]; let t = 0; while (t < g.length && !/[^.]/.test(g[t])) t++; _topCache[u.kind] = sp.foot[1] - t; }
-  return FLOOR + u.dy - Math.round(_topCache[u.kind] * 0.55);
+  return FLOOR + u.dy + (u.land || 0) - Math.round(_topCache[u.kind] * 0.55);
 }
 function handPos(u, pose) {
   const a = (SPR[u.kind].anch || {})[pose] || [12, -26];
@@ -3050,7 +3109,8 @@ function step() {
 // v1.8.0:時間で進める(画面のリフレッシュレートが 120Hz などでも同じ速さ)。
 // サンプルは 1秒に60コマだったが、ガトー「早すぎる」で ふつう=1秒に STEPS_PER_SEC コマ
 // v1.8.1:ガトー「前々回(60)と前回(38)の中間」→ 49。前回の速さは「速度:おそい」(main.js の battle.speed = 49/38)
-const STEPS_PER_SEC = 49;
+// v1.8.2:ガトー「もう少しだけ早く」→ 54(1割ほど速く)。おそい は v1.8.0 の 38 のまま(main.js の battle.speed = 54/38)
+const STEPS_PER_SEC = 54;
 // v1.8.1:とどめのスロー。HPが0になってから KO_SLOW_STEPS コマのあいだ、KO_SLOW 倍ゆっくり(倒れたキャラが消えるまで)
 const KO_SLOW = 2.2, KO_SLOW_STEPS = 64;
 let slowKo = 0, onKo = null, koExtra = 60, koWatch = null;
@@ -3225,7 +3285,7 @@ async function ko(side) {
   const d = unitOf(side);
   for (let i = 0; i < 40 && d.alpha > 0; i++) {
     d.flash = (i % 6 < 3) ? 2 : 0; d.alpha = 1 - i / 40;
-    if (i % 3 === 0) addPx(d.x + (Math.random() * 16 - 8), FLOOR - Math.random() * 34, 18, COOL, 0, -0.6, 2);
+    koBubbles(d, i);
     await frame();
   }
   d.alpha = 0;

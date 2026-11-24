@@ -37,6 +37,7 @@
     if (name === "ttsetup") renderTTSetup(); // v1.7.0
     if (name !== "battle") battle.team = null;
     $("#tt-topnext").hidden = true; // v1.7.4
+    arcStatsSync(); // v1.8.2
     if (name === "howto") $("#screen-howto").scrollTop = 0;
     if (name === "data") renderData(); // v1.6.4
     window.scrollTo(0, 0);
@@ -160,8 +161,24 @@
     void menu.offsetWidth; // アニメーションをやり直す
     menu.classList.add("enter");
   }
+  // v1.8.2:起動したとき、背景だけが下から上へスクロールして今の位置で止まり、そのあと紋章とロゴ、残りの文字が出る。
+  //         途中で押すと(クリック・Enter)最後の形まで飛ばす
+  let introTimers = [];
+  const titleBg = $(".title-bg");
+  function endIntro() {
+    introTimers.forEach(clearTimeout); introTimers = [];
+    titleScreen.classList.remove("intro", "show"); titleBg.classList.remove("intro", "show");
+  }
+  function startIntro() {
+    if (!titleScreen.classList.contains("active")) return;
+    titleScreen.classList.add("intro"); titleBg.classList.add("intro");
+    introTimers.push(setTimeout(() => { titleScreen.classList.add("show"); titleBg.classList.add("show"); }, 3200));
+    introTimers.push(setTimeout(endIntro, 3200 + 1800));
+  }
+  startIntro();
   let pressing = false;
   async function pressStart() {
+    if (titleScreen.classList.contains("intro")) { endIntro(); return; }
     if (pressing || titleScreen.dataset.stage !== "press") return;
     pressing = true;
     const fade = $("#title-fade");
@@ -1304,7 +1321,7 @@
   function animSkillsSync() { for (const side of ["left", "right"]) BA.setSkills(side, animSkills(side)); }
   // 1つのイベントをアニメで見せる。true:見せ終わった(いつもの演出はしない)/ false:いつもの演出も続ける
   async function animEvent(e, token) {
-    if (e.type === "round") { anim.pend = {}; return false; }
+    if (e.type === "round") { anim.pend = {}; animTurnTags(e.first); return false; }
     if (e.type === "hit" || e.type === "miss") return animStrike(e, token);
     if (e.type === "skill" && e.ougi && ANIM_OUGI[e.skill]) {
       const k = ANIM_OUGI[e.skill];
@@ -1333,6 +1350,21 @@
     }
     animNote(e);
     return false;
+  }
+  // v1.8.2:ラウンドの最初に、アニメの画面の左と右へ「先攻」「後攻」を数秒(2.6秒)出す
+  //         (キャラ枠の上の札はアニメに隠れて見えないため。左右から入ってきて、少しして消える)
+  function animTurnTags(firstSide) {
+    if (!firstSide || battle.skip) return;
+    const arena = $("#arena");
+    $$(".ba-turn", arena).forEach((t) => t.remove());
+    for (const side of ["left", "right"]) {
+      const tag = document.createElement("div");
+      const isFirst = side === firstSide;
+      tag.className = `ba-turn ${side} ${isFirst ? "first" : "second"}`;
+      tag.textContent = isFirst ? "先攻" : "後攻";
+      arena.appendChild(tag);
+      setTimeout(() => tag.remove(), 2700);
+    }
   }
   // 攻撃以外のイベント:アニメの上にも数字・文字を出す
   function animNote(e) {
@@ -2839,6 +2871,7 @@
       : `${saved.name} ・ スキル:${arcSkillModeText(st.skillMode)} ・ コンティニュー${st.continues}回 ・ 10体目を倒すと★、EXTRAのイナを倒すと★★`;
     renderLadder(st);
     renderArcMe(st);
+    arcStatsSync(); // v1.8.2
     const q = $("#btn-arc-quit");
     q.dataset.confirm = "";
     q.textContent = st.done ? "結果を消して最初から" : "アーケードをやめる";
@@ -3192,6 +3225,50 @@
       opts: { foeWeapons: foes.map((e) => e.weapon), skills: { left: st.members.map((m) => m.skills.slice()), right: foes.map((e) => [e.skill, ...(e.extraSkills || [])]) } },
     });
   }
+
+  // v1.8.2:アーケードの3on3のとき、「タイトルへ戻る」の右に「3人のステータス」ボタン。押すと3人のレベル・能力値・スキル・武器
+  //         (アーケードの画面と、3on3のバトル(出すキャラを選ぶ画面の上にも出る))
+  function arcStatsOn() {
+    const st = arcState;
+    if (!st || !A_.isTeam(st) || st.done) return false;
+    const scr = ($(".screen.active") || {}).id;
+    if (scr === "screen-arcade") return true;
+    return scr === "screen-battle" && !!(battle.team && battle.ttCfg && battle.ttCfg.arc);
+  }
+  function arcStatsPlace() {
+    const btn = $("#nav-arcstats"), home = $("#nav-home");
+    if (btn.hidden || home.hidden) return;
+    const r = home.getBoundingClientRect();
+    btn.style.top = Math.round(r.top) + "px";
+    btn.style.left = Math.round(r.right + 10) + "px";
+    btn.style.height = Math.round(r.height) + "px";
+  }
+  function arcStatsSync() {
+    const on = arcStatsOn();
+    $("#nav-arcstats").hidden = !on;
+    if (!on) $("#arc-stats").hidden = true;
+    else global.requestAnimationFrame(arcStatsPlace);
+  }
+  function arcStatsOpen() {
+    const st = arcState;
+    if (!st || !A_.isTeam(st)) return;
+    const saved = arcTeamSaved(st);
+    $("#arc-stats-body").innerHTML = st.members.map((m, k) => {
+      const me = A_.playerChar(m, saved[k]);
+      if (!me) return "";
+      const wid = me.weapons.includes(m.weapon) ? m.weapon : me.weapons[0];
+      const w = wid ? UI.charWeapon(me, wid) : null;
+      return `<div>${UI.fighterHeader(me, {})}<div class="arc-me-skill"><span class="sp-k">スキル</span>${chips(m.skills) || '<span class="muted">まだ選んでいない</span>'}</div>${UI.statGrid(me, {})}${w ? `<div class="weapon-line tt-wline">${UI.weaponLine(w)}</div>` : ""}</div>`;
+    }).join("");
+    $("#arc-stats").hidden = false;
+    $(".arc-stats-box", $("#arc-stats")).scrollTop = 0;
+  }
+  $("#nav-arcstats").addEventListener("click", (e) => { e.stopPropagation(); arcStatsOpen(); });
+  $("#arc-stats").addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (e.target.id === "arc-stats" || e.target.closest("#arc-stats-close")) $("#arc-stats").hidden = true;
+  });
+  global.addEventListener("resize", () => arcStatsSync());
 
   // 勝ったあとのレベルアップ・クラスチェンジを1回ずつ見せる(タップで次へ)
   async function playArcPending() {
@@ -4019,6 +4096,7 @@
     const foeSeen = foeAlive.filter((i) => ttKnown(st, foeSide, i, side));
     const foeFirst = foeSeen.find((i) => foeOk.includes(i)) ?? foeSeen[0] ?? foeOk[0] ?? foeAlive[0];
     ttSel = { left: null, right: null };
+    ttLastTap = null; // v1.8.2
     ttSel[side] = mine[0];
     ttSel[foeSide] = foeFirst == null ? null : foeFirst;
     const who = st.versus ? `${ttSideName(st, side)}が` : "";
@@ -4044,6 +4122,7 @@
     return i;
   }
   let ttPickRender = null;
+  let ttLastTap = null; // v1.8.2:ダブルタップの判定(最後に押したカードと時刻)
   $("#tt-pick").addEventListener("click", (e) => {
     if (!ttPickResolve || !battle.team) return;
     const st = battle.team;
@@ -4051,7 +4130,16 @@
     const b = e.target.closest("button.tt-card[data-i]");
     if (b && !b.disabled) {
       const side = b.dataset.side, i = Number(b.dataset.i);
-      ttSel[side] = side === foe && ttSel[foe] === i ? null : i;
+      // v1.8.2:相手のキャラをもう一度押しても、カーソル(戦闘予測)を外さない(前は外れていた)
+      ttSel[side] = i;
+      // v1.8.2:自分のキャラをダブルタップ(すばやく2回押す)すると、そのキャラを出す(「決定」と同じ)
+      const now = Date.now(), lt = ttLastTap;
+      ttLastTap = { side, i, t: now };
+      if (side === me && lt && lt.side === side && lt.i === i && now - lt.t < 450 && TB.allowed(st, me).includes(i)) {
+        ttLastTap = null;
+        ttPickResolve(i);
+        return;
+      }
       // v1.7.2:自分のキャラを選んだら、相手のいちばん左の(倒れていない)キャラに自動でカーソルを合わせる
       if (side === me && ttSel[foe] == null) {
         const first = st.team[foe].findIndex((u) => u.hp > 0);
@@ -4192,6 +4280,7 @@
     tourMatch = null; arcMatch = null;
     goto("battle");
     battle.team = st; battle.ttCfg = cfg; battle.tour = null; battle.arc = null; battle.owner = {}; battle.skip = false; battle.ttHeal = null;
+    arcStatsSync(); // v1.8.2
     ttView = "left";
     const token = battle.token;
     $("#battle-log").innerHTML = "";
@@ -4373,14 +4462,14 @@
     if (battle.wake) battle.wake();
   });
   // v1.8.1:速度は ふつう → はやい → おそい の3つ。おそい = v1.8.0 の戦闘アニメの速さ(1秒に38コマ。ふつうは49コマ)。選んだ速度は覚えておく
-  const SPEEDS = [{ v: 1, label: "ふつう" }, { v: 0.45, label: "はやい" }, { v: 49 / 38, label: "おそい" }];
+  const SPEEDS = [{ v: 1, label: "ふつう" }, { v: 0.45, label: "はやい" }, { v: 54 / 38, label: "おそい" }]  // v1.8.2:ふつう 49→54コマ。おそいは v1.8.0 の38コマのまま;
   const SPEED_KEY = "arenaBattle.speed";
   function speedRender() {
     const sp = SPEEDS.find((x) => x.v === battle.speed) || SPEEDS[0];
     $("#btn-speed").textContent = `速度:${sp.label}`;
     if (BA) BA.setSpeed(battle.speed); // v1.8.0
   }
-  try { const v = Number(global.localStorage.getItem(SPEED_KEY)); if (SPEEDS.some((x) => x.v === v)) battle.speed = v; } catch (e) { /* ふつうのまま */ }
+  try { let v = Number(global.localStorage.getItem(SPEED_KEY)); if (Math.abs(v - 49 / 38) < 1e-9) v = 54 / 38; /* v1.8.1 の おそい */ if (SPEEDS.some((x) => x.v === v)) battle.speed = v; } catch (e) { /* ふつうのまま */ }
   speedRender();
   $("#btn-speed").addEventListener("click", () => {
     const i = SPEEDS.findIndex((x) => x.v === battle.speed);
