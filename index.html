@@ -11,10 +11,10 @@
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <title>闘技場バトル</title>
 <!-- v1.8.0:css・js に ?v=版 をつける(GitHub Pages で前の版の main.js などがキャッシュに残り、新しい機能が動かないのを防ぐ。版を上げたら一緒に変える) -->
-<link rel="stylesheet" href="css/style.css?v=1.8.2">
+<link rel="stylesheet" href="css/style.css?v=1.8.3">
 <!-- v1.6.6:スマホ縦向きのバトル準備・バトル(portrait_auto.css は tools/build_portrait_css.py が作る) -->
-<link rel="stylesheet" href="css/portrait_auto.css?v=1.8.2">
-<link rel="stylesheet" href="css/portrait.css?v=1.8.2">
+<link rel="stylesheet" href="css/portrait_auto.css?v=1.8.3">
+<link rel="stylesheet" href="css/portrait.css?v=1.8.3">
 </head>
 <body>
 
@@ -43,7 +43,7 @@
         <div class="title-logo">
           <img class="title-emblem" src="assets/title_emblem.png" alt="" width="512" height="344">
           <h1 class="title-heading">闘技場バトル</h1>
-          <p class="version">v1.8.2</p>
+          <p class="version">v1.8.3</p>
         </div>
         <button type="button" class="press-start" id="press-start">Press click</button>
         <nav class="title-menu">
@@ -227,8 +227,9 @@
           <h3>バトル準備</h3>
           <ul class="howto-ul">
             <li>1P・2Pのキャラと、その対戦で使う<b>武器</b>を選びます。▲は3すくみ有利、▼は不利、⚠特効は相手に特効がある武器です。</li>
+            <li>2Pのキャラで「<b>🎲 ランダムに生まれたキャラ</b>」を選ぶと、だれも知らないキャラが相手になります(キャラ一覧には入りません。もう一度選ぶと別のキャラ)。</li>
             <li><b>バイオリズム</b>は対戦ごとに変わります。好調=命中・回避+10・必殺+5、不調=命中・回避-10。</li>
-            <li>真ん中の<b>戦闘予測</b>で、威力・命中・必殺・攻速を確かめられます。「×2」は1ラウンドに2回攻撃するという意味です。</li>
+            <li>真ん中の<b>戦闘予測</b>で、威力・命中・必殺・攻速を確かめられます。「×2」は1ラウンドに2回攻撃するという意味です。戦闘予測の<b>武器の名前(▾)を押す</b>と、その場で武器を変えられます。</li>
             <li>ラグズは「化身前/化身後」のスイッチで、それぞれの能力値と予測を見られます。</li>
             <li>オプション:<b>1〜3本先取</b>、<b>スキル抽選</b>のON/OFF、抽選の演出のON/OFF(演出はタップで飛ばせます)。</li>
             <li><b>スキル選択</b>をONにすると、好きなスキルを1つ選んで戦えます(このときスキル抽選と抽選の演出はありません)。</li>
@@ -637,21 +638,21 @@
     <button type="button" class="btn btn-small talk-skip" id="talk-skip" hidden>会話をスキップ ▶▶</button>
   </div>
 
-  <script src="js/gamedata.js?v=1.8.2"></script>
-  <script src="js/config.js?v=1.8.2"></script>
-  <script src="js/rng.js?v=1.8.2"></script>
-  <script src="js/gamedb.js?v=1.8.2"></script>
-  <script src="js/generator.js?v=1.8.2"></script>
-  <script src="js/randomchar.js?v=1.8.2"></script>
-  <script src="js/battle.js?v=1.8.2"></script>
-  <script src="js/tournament.js?v=1.8.2"></script>
-  <script src="js/arcade.js?v=1.8.2"></script>
-  <script src="js/teambattle.js?v=1.8.2"></script>
-  <script src="js/storage.js?v=1.8.2"></script>
-  <script src="js/ui.js?v=1.8.2"></script>
+  <script src="js/gamedata.js?v=1.8.3"></script>
+  <script src="js/config.js?v=1.8.3"></script>
+  <script src="js/rng.js?v=1.8.3"></script>
+  <script src="js/gamedb.js?v=1.8.3"></script>
+  <script src="js/generator.js?v=1.8.3"></script>
+  <script src="js/randomchar.js?v=1.8.3"></script>
+  <script src="js/battle.js?v=1.8.3"></script>
+  <script src="js/tournament.js?v=1.8.3"></script>
+  <script src="js/arcade.js?v=1.8.3"></script>
+  <script src="js/teambattle.js?v=1.8.3"></script>
+  <script src="js/storage.js?v=1.8.3"></script>
+  <script src="js/ui.js?v=1.8.3"></script>
   <!-- v1.8.0:戦闘アニメ(ドット絵と動き) -->
-  <script src="js/battleanim_sprites.js?v=1.8.2"></script>
-  <script src="js/battleanim.js?v=1.8.2"></script>
-  <script src="js/main.js?v=1.8.2"></script>
+  <script src="js/battleanim_sprites.js?v=1.8.3"></script>
+  <script src="js/battleanim.js?v=1.8.3"></script>
+  <script src="js/main.js?v=1.8.3"></script>
 </body>
 </html>

@@ -2504,3 +2504,52 @@ body:has(#screen-title.active) { background: transparent; }
 @media (max-height: 500px) and (orientation: landscape) {
   .title-logo { --emb: 118px; }
 }
+
+/* =========================================================
+   v1.8.3
+   ========================================================= */
+/* スマホのガタつき:ROUND・BATTLE・先攻/後攻などの演出の文字が画面の右へはみ出し、ページの幅が一瞬広がって
+   画面全体が揺れていた → バトル画面では、はみ出した分を切る(見た目は同じ) */
+#app:has(#screen-battle.active) { overflow-x: clip; }
+html:has(#screen-battle.active), body:has(#screen-battle.active) { overflow-x: hidden; }
+
+/* タイトル:紋章を少し小さく・暗くして、ロゴ(闘技場バトル)より目立たないように。
+   紋章の高さはロゴの箱(.title-logo の min-height)より小さくし、上の「名前に宿る力で戦え」と下のボタンに重ならないように */
+.title-logo { --emb: clamp(120px, 26vh, 250px); min-height: clamp(130px, 29vh, 270px); }
+.title-logo .title-emblem { filter: brightness(.6) saturate(.85) drop-shadow(0 0 18px rgba(0, 0, 0, .6)); opacity: .82; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .title-logo { --emb: 96px; min-height: 104px; }
+}
+
+/* アーケードの結果(アーケード終了):スマホでは、キャラの絵を上・名前と記録を下に並べる(3on3の名前が縦に細長くなっていた) */
+.arc-champ em.nw { font-style: normal; white-space: nowrap; }
+.arc-champ .arc-champ-icons { display: flex; gap: 10px; justify-content: center; }
+@media (orientation: portrait) and (max-width: 600px) {
+  .arc-champ { display: flex; flex-direction: column; gap: 8px; padding: 4px 6px; }
+  .arc-champ b { font-size: 1.6rem; }
+  .arc-champ.team b { font-size: 1.25rem; letter-spacing: .04em; }
+  .arc-champ.team .char-icon.large { width: 64px; height: 64px; font-size: 1.9rem; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .arc-champ.team b { font-size: 1.3rem; }
+}
+/* タイトル:「バトル」を押したとき、スマホ縦向きでロゴと紋章が少し上に動いていた(モード選択だけ上の余白が 6vh→5vh)。
+   メニューとモード選択で上の余白をそろえて、動かないように */
+@media (orientation: portrait) and (max-width: 600px) {
+  #screen-title .title-box, #screen-title[data-stage="mode"] .title-box { padding-top: 5vh; }
+  #screen-title[data-stage] .title-logo .title-heading { margin: 0; }
+}
+
+/* v1.8.3:戦闘予測の武器を押すと、武器を変えられる(名前の横に ▾。押すと下に武器の一覧) */
+.forecast { position: relative; }
+.fc-wbtn { all: unset; cursor: pointer; font: inherit; color: inherit; border-bottom: 1px dotted rgba(232, 201, 106, .7); }
+.fc-wbtn i { font-style: normal; font-size: .75em; color: var(--gold); margin-left: 2px; }
+.fc-wbtn:hover, .fc-wbtn:focus-visible { color: #ffe7a0; }
+.fc-wmenu { position: absolute; z-index: 30; min-width: 62%; max-width: 92%; display: flex; flex-direction: column; gap: 2px; padding: 4px;
+  background: #121a36; border: 1px solid var(--gold); border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, .7); text-align: left; }
+.fc-wmenu.left { left: 4px; }
+.fc-wmenu.right { right: 4px; }
+.fc-witem { all: unset; cursor: pointer; display: block; padding: 5px 8px; border-radius: 5px; font-size: .85rem; font-weight: bold; line-height: 1.3; }
+.fc-witem small { display: block; font-weight: normal; font-size: .72rem; color: var(--muted); }
+.fc-witem:hover, .fc-witem:focus-visible { background: #24305e; }
+.fc-witem.on { background: #2c3a72; box-shadow: inset 3px 0 0 var(--gold); }

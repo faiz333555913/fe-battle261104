@@ -351,6 +351,7 @@ function draw() {
     R(p.x, p.y, p.size, p.size, p.colors[k]);
   }
   camX = 0; camY = 0;
+  if (!cut) for (const u of Object.values(units)) drawBonus(u); // v1.8.3:補正の表示
   if (cut) drawCutIn();
   drawHUD();
   for (const t of texts) {
@@ -442,8 +443,51 @@ function panel(u, x0) {
     txt(k, x0 + 94, 133 + i * 11, 6, '#9ab0e8'); txt(String(v), x0 + 123, 133 + i * 11, 6, '#ffffff', 'right');
   });
   if (u.st.times > 1) txt(`×${u.st.times}`, x0 + 93, 133, 6, '#ffd040', 'right');
+  gaugeBar(u, x0); // v1.8.3
 }
 function drawHUD() { panel(units.s, 0); panel(units.a, 128); }
+// v1.8.3:化身ゲージ(ラグズだけ)。スキルの行とHPの行のあいだに、20目盛りのバー。
+//   たまっていく間は橙、化身中は赤(化身中はだんだん減る)。いっぱいのときは少し光る
+function gaugeBar(u, x0) {
+  const g = u.gauge;
+  if (!g) return;
+  const y = 154, n = Math.max(1, g.max || 20), v = Math.max(0, Math.min(n, g.v));
+  txt(g.on ? '化身中' : '化身', x0 + 6, y + 4, 5, g.on ? '#ff9a80' : '#ffc870');
+  const bx = x0 + (g.on ? 26 : 20), full = v >= n && !g.on && (T % 20) < 10;
+  for (let i = 0; i < n; i++) {
+    const on = i < v;
+    const c3 = on ? (g.on ? ['#ffd0c0', '#ff6a48', '#b83020'] : full ? ['#ffffff', '#fff0a0', '#ffc040'] : ['#fff0b0', '#ffb030', '#c07010']) : ['#2e2826', '#3a2a28', '#3a2a28'];
+    for (let k = 0; k < 3; k++) R(bx + i * 3, y + k, 2, 1, c3[k]);
+  }
+}
+// v1.8.3:戦う前に、キャラの頭の上へ補正(攻撃+3 など)を約1.5秒。だんだん透明になって消える(時間で消える。アニメは止めない)
+const BONUS_MS = 1500, BONUS_HOLD = 0.45;
+function drawBonus(u) {
+  const b = u.bonusTag;
+  if (!b) return;
+  const el = Date.now() - b.at;
+  if (el >= BONUS_MS || u.alpha <= 0) { u.bonusTag = null; return; }
+  const p = el / BONUS_MS;
+  const a = p < BONUS_HOLD ? 1 : 1 - (p - BONUS_HOLD) / (1 - BONUS_HOLD);
+  const lift = Math.round(p * 4);
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, a);
+  ctx.font = `bold ${7 * S}px "Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif`;
+  ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = S * 2; ctx.strokeStyle = '#0a0a18';
+  const top = Math.max(2, FLOOR + u.dy - bodyBox(u).h - 3 - b.lines.length * 9 - lift);
+  b.lines.forEach((line, i) => {
+    // 1行に2つまで。プラスは緑、マイナスは赤
+    let x = u.x * S - ctx.measureText(line.map((t) => t.text).join(' ')).width / 2;
+    ctx.textAlign = 'left';
+    for (const t of line) {
+      const yy = (top + i * 9 + 7) * S;
+      ctx.strokeText(t.text, x, yy); ctx.fillStyle = t.v > 0 ? '#8cf0a0' : '#ff8a7a'; ctx.fillText(t.text, x, yy);
+      x += ctx.measureText(t.text + ' ').width;
+    }
+  });
+  ctx.restore();
+}
+
 
 /* ===== 動き ===== */
 async function moveTo(u, tx, speed, run = true) {
@@ -3161,6 +3205,7 @@ function applyInfo(u, p) {
   if (p.st) u.st = { dmg: p.st.dmg, hit: p.st.hit, crt: p.st.crt, times: p.st.times || 1 };
   u.skills = (p.skills || []).slice();
   u.move = p.move || null;
+  u.gauge = p.gauge ? { v: p.gauge.gauge, max: p.gauge.max, on: !!p.gauge.transformed } : null; // v1.8.3:化身ゲージ
   applyColor(u, p.color);
 }
 function makeGameUnit(p, home, dir) {
@@ -3307,11 +3352,26 @@ function heal(side, n, cols) {
   popText('+' + n, u.x, FLOOR + u.dy - 44, '#70f090', 13);
 }
 function sleep(side, on) { if (sideReady()) unitOf(side).sleep = on ? 9999 : 0; }
+// v1.8.3:化身ゲージ({ gauge, max, transformed })
+function setGauge(side, g) {
+  if (!sideReady()) return;
+  const u = unitOf(side);
+  u.gauge = g ? { v: g.gauge, max: g.max || (u.gauge && u.gauge.max) || 20, on: !!g.transformed } : null;
+}
+// v1.8.3:補正を頭の上に出す。list:[{ label:'攻撃', v:3 }, ...](0 は出さない)
+function bonusTag(side, list) {
+  if (!sideReady() || fast) return;
+  const items = (list || []).filter((x) => x.v).map((x) => ({ text: `${x.label}${x.v > 0 ? '+' : ''}${x.v}`, v: x.v }));
+  if (!items.length) return;
+  const lines = [];
+  for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2));
+  unitOf(side).bonusTag = { lines, at: Date.now() };
+}
 function glow(side, n = 40) { if (sideReady()) unitOf(side).glow = n; }
 
 global.BattleAnim = {
   mount, unmount, setup, setHp, setStats, setSkills, attack,
-  ougiSelf, transform, ko, hurt, heal, sleep, glow, popAt,
+  ougiSelf, transform, ko, hurt, heal, sleep, glow, popAt, setGauge, bonusTag,
   flush, spriteFor, moveFor,
   onKo: (f) => { onKo = f || null; }, // v1.8.1:HPが0になった瞬間に呼ぶ(side)
   setSpeed: (s) => { speed = s || 1; },

@@ -670,6 +670,7 @@
     }
     ["left", "right"].forEach((side, idx) => {
       const p = prep[side];
+      if (p && p.gen && !p.arc) { prep[side].bio = rollBio(); return; } // v1.8.3:ランダムに生まれた相手はそのまま
       if (!p || p.arc || !S.find(p.charId) || isBanned(S.find(p.charId))) {
         const c = chars[Math.min(idx, chars.length - 1)];
         prep[side] = { charId: c.id, weaponId: c.weapons[0], bio: null, view: "human" };
@@ -682,7 +683,29 @@
   // v1.6.0:バトル準備のキャラ(アーケードは今のレベルの自分のキャラと、敵)
   function charFor(side) {
     if (arcMatch) return side === "left" ? arcPlayer() : arcEnemy();
+    if (prep[side].gen) return prep[side].gen; // v1.8.3:ランダムに生まれた相手(キャラ一覧には入らない)
     return S.find(prep[side].charId);
+  }
+  // v1.8.3:闘技場の1対1でも、3on3と同じように相手(2P)をランダムに生み出せる。
+  //   2Pのキャラ選択の「🎲 ランダムに生まれたキャラ」を選ぶと、だれも知らないキャラが生まれる(キャラ一覧には入らない)。
+  //   もう一度選ぶと、別のキャラに生まれ変わる
+  const RANDOM_FOE = "__random", GEN_FOE = "__gen";
+  function randomFoeChar() {
+    for (let guard = 0; guard < 100; guard++) {
+      const n = G.normalizeInputs(global.RandomChar.randomInputs(Math.random));
+      if (!n.ok) continue;
+      const c = G.generateCharacter(n.value);
+      if (isBanned(c)) continue;
+      c.generated = true;
+      return c;
+    }
+    return null;
+  }
+  function randomFoeOptions(side, char) {
+    if (side !== "right" || tourMatch || arcMatch) return "";
+    const g = prep.right.gen;
+    return (g ? `<option value="${GEN_FOE}" selected>${UI.esc(char.name)}(${UI.esc(char.className)})※ランダム</option>` : "")
+      + `<option value="${RANDOM_FOE}">${g ? "🎲 別のキャラをランダムで生み出す" : "🎲 ランダムに生まれたキャラ"}</option>`;
   }
   function prepUnits() {
     const l = charFor("left"), r = charFor("right");
@@ -793,7 +816,7 @@
       const char = me.char;
       const options = arcMatch ? `<option selected>${UI.esc(char.name)}(${UI.esc(char.className)} Lv${char.arcadeLv})${side === "right" ? " ※敵" : ""}</option>` : (tourMatch ? chars.filter((c) => c.id === char.id) : chars).map((c) => isBanned(c)
         ? `<option value="${UI.esc(c.id)}" disabled>${UI.esc(c.name)}(${UI.esc(c.className)})※出禁</option>`
-        : `<option value="${UI.esc(c.id)}" ${c.id === char.id ? "selected" : ""}>${UI.esc(c.name)}(${UI.esc(c.className)})</option>`).join("");
+        : `<option value="${UI.esc(c.id)}" ${c.id === char.id && !prep[side].gen ? "selected" : ""}>${UI.esc(c.name)}(${UI.esc(c.className)})</option>`).join("") + randomFoeOptions(side, char);
       // v1.6.0:アーケードの敵は武器が決まっている(その武器だけ出す)
       const weapons = char.weapons.filter((id) => !(arcMatch && side === "right" && id !== me.weapon.id)).map((id) => {
         const w = UI.charWeapon(char, id);
@@ -870,8 +893,11 @@
       switchView(e.target.dataset.side, e.target.checked ? "transformed" : "human");
     } else if (e.target.matches(".char-select")) {
       const side = e.target.dataset.side;
-      const c = S.find(e.target.value);
-      prep[side] = { charId: c.id, weaponId: c.weapons[0], bio: rollBio(), view: "human", skill: null };
+      if (e.target.value === GEN_FOE) return;
+      const gen = e.target.value === RANDOM_FOE ? randomFoeChar() : null;
+      const c = gen || S.find(e.target.value);
+      if (!c) { renderPrepSides(); return; }
+      prep[side] = { charId: c.id, weaponId: c.weapons[0], bio: rollBio(), view: "human", skill: null, gen };
       renderPrepSides();
     } else if (e.target.matches(".skill-select")) {
       prep[e.target.dataset.side].skill = e.target.value; // v1.5.0:スキル選択
@@ -939,7 +965,7 @@
         <span class="fc-k">戦闘予測</span>
         <span class="fc-name">${f.left.effective ? '<span class="danger" title="相手の武器が特効">⚠</span>' : ""}${UI.esc(R.name)}</span>
       </div>
-      ${row("武器", `${UI.esc(L.weapon.name)}${UI.triMark(f.left.tri)}`, `${UI.triMark(f.right.tri)}${UI.esc(R.weapon.name)}`, "fc-small")}
+      ${row("武器", `${fcWeaponName(el, "left", L)}${UI.triMark(f.left.tri)}`, `${UI.triMark(f.right.tri)}${fcWeaponName(el, "right", R)}`, "fc-small")}
       ${row("HP", L.hp, R.hp)}
       ${row("威力", dmgText(f.left) + danger(f.left), danger(f.right) + dmgText(f.right), "", "mt")}
       ${row("命中", f.left.hit, f.right.hit, "", "hit")}
@@ -960,6 +986,58 @@
       flash(n, up ? "fc-up" : "fc-down");
     });
   }
+
+  // v1.8.3:戦闘予測の武器の名前を押すと、その場で武器を変えられる(バトル準備の戦闘予測だけ)。
+  //   変えられないとき(武器が1つだけ・アーケードの敵)は、今までどおりの文字
+  function fcCanChange(side) {
+    if (!prep[side] || (arcMatch && side === "right")) return false;
+    const c = charFor(side);
+    return !!c && c.weapons.filter((id) => UI.charWeapon(c, id)).length > 1;
+  }
+  function fcWeaponName(el, side, u) {
+    if (el.id !== "forecast" || !fcCanChange(side)) return UI.esc(u.weapon.name);
+    return `<button type="button" class="fc-wbtn" data-side="${side}" aria-haspopup="listbox" title="押すと武器を変えられます">${UI.esc(u.weapon.name)}<i aria-hidden="true">▾</i></button>`;
+  }
+  function fcCloseMenu() { $$("#forecast .fc-wmenu").forEach((m) => m.parentNode.removeChild(m)); }
+  function fcOpenMenu(btn) {
+    const side = btn.dataset.side;
+    const had = $(`#forecast .fc-wmenu[data-side="${side}"]`);
+    fcCloseMenu();
+    if (had) return; // もう一度押したら閉じる
+    const { L, R } = prepUnits();
+    const me = side === "left" ? L : R, foe = side === "left" ? R : L;
+    const c = me.char;
+    const items = c.weapons.map((id) => {
+      const w = UI.charWeapon(c, id);
+      if (!w) return "";
+      const tri = B.triangle(w, foe.weapon);
+      return `<button type="button" class="fc-witem${id === me.weapon.id ? " on" : ""}" role="option" aria-selected="${id === me.weapon.id}" data-side="${side}" data-id="${UI.esc(id)}">${UI.esc(w.name)}${UI.triMark(tri)}<small>威力${w.might} 命中${w.hit} 必殺${w.crit} 重さ${w.weight}</small></button>`;
+    }).join("");
+    const menu = document.createElement("div");
+    menu.className = `fc-wmenu ${side}`;
+    menu.dataset.side = side;
+    menu.setAttribute("role", "listbox");
+    menu.innerHTML = items;
+    const fc = $("#forecast");
+    fc.appendChild(menu);
+    const fr = fc.getBoundingClientRect(), br = btn.getBoundingClientRect();
+    menu.style.top = `${br.bottom - fr.top + 2}px`;
+  }
+  function fcChooseWeapon(side, id) {
+    fcCloseMenu();
+    if (!fcCanChange(side) || prep[side].weaponId === id) return;
+    prep[side].weaponId = id;
+    if (tourMatch) { tourState.weapons[prep[side].charId] = id; saveTour(); }
+    if (arcMatch && side === "left") { arcState.weapon = id; saveArc(); }
+    renderPrepSides();
+  }
+  $("#forecast").addEventListener("click", (e) => {
+    const item = e.target.closest(".fc-witem");
+    if (item) { e.preventDefault(); fcChooseWeapon(item.dataset.side, item.dataset.id); return; }
+    const b = e.target.closest(".fc-wbtn");
+    if (b) { e.preventDefault(); fcOpenMenu(b); }
+  });
+  document.addEventListener("click", (e) => { if (!e.target.closest("#forecast .fc-wmenu, #forecast .fc-wbtn")) fcCloseMenu(); });
 
   // ================= v1.6.6:スマホ縦向きのバトル準備 =================
   // 1P・2P・対戦(戦闘予測)のタブ、画面の下に固定する小さな戦闘予測、武器の「変更」、⚙設定。
@@ -1284,6 +1362,7 @@
       hp: num(".hp-cur", u.hp), max: (battle.maxHp && battle.maxHp[side]) || u.maxHp,
       st: { dmg: num('[data-k="damage"] .n', 0), hit: num('[data-k="hit"] .n', 0), crt: num('[data-k="crit"] .n', 0), times: animTimes(el) },
       skills: animSkills(side),
+      gauge: u.laguz ? { gauge: u.laguz.gauge, max: C.laguzGauge.max, transformed: !!u.laguz.transformed } : null, // v1.8.3
       color: colorName, transformed: el.classList.contains("transformed"), move: { category: w.category },
     };
   }
@@ -1309,6 +1388,7 @@
     BA.setSpeed(battle.speed);
     BA.setup(animDesc("left"), animDesc("right"));
     BA.mount(arena);
+    anim.bonusPending = !battle.idx; // v1.8.3:戦う前(最初のラウンド)に補正を出す
     anim.shown = true;
     arena.classList.add("ba-on");
   }
@@ -1321,7 +1401,9 @@
   function animSkillsSync() { for (const side of ["left", "right"]) BA.setSkills(side, animSkills(side)); }
   // 1つのイベントをアニメで見せる。true:見せ終わった(いつもの演出はしない)/ false:いつもの演出も続ける
   async function animEvent(e, token) {
-    if (e.type === "round") { anim.pend = {}; animTurnTags(e.first); return false; }
+    if (e.type === "round") { anim.pend = {}; animTurnTags(e.first); animBonusTags(); return false; }
+    // v1.8.3:『空の祝福』は奥義の演出をやめて、『回復』と同じ回復の演出(緑の光と +の数字)にする
+    if (e.type === "skill" && e.skill === "空の祝福" && e.heal) { animNote(e); return false; }
     if (e.type === "hit" || e.type === "miss") return animStrike(e, token);
     if (e.type === "skill" && e.ougi && ANIM_OUGI[e.skill]) {
       const k = ANIM_OUGI[e.skill];
@@ -1364,6 +1446,19 @@
       tag.textContent = isFirst ? "先攻" : "後攻";
       arena.appendChild(tag);
       setTimeout(() => tag.remove(), 2700);
+    }
+  }
+  // v1.8.3:戦う前に、キャラの頭の上へ補正(バトル準備の戦闘予測の「補正」と同じ数字)を約1.5秒。待たずに戦いは進む
+  function animBonusTags() {
+    if (!anim.bonusPending || battle.skip) return;
+    anim.bonusPending = false;
+    const L = battle.L, R = battle.R;
+    if (!L || !R) return;
+    const LABELS = [["attack", "攻撃"], ["defense", "防御"], ["hit", "命中"], ["avoid", "回避"], ["crit", "必殺"]];
+    for (const [side, u, foe] of [["left", L, R], ["right", R, L]]) {
+      let b;
+      try { b = B.bonusSummary(u, foe); } catch (err) { continue; }
+      BA.bonusTag(side, LABELS.map(([k, label]) => ({ label, v: b[k] || 0 })));
     }
   }
   // 攻撃以外のイベント:アニメの上にも数字・文字を出す
@@ -1739,6 +1834,7 @@
     fill.style.width = (g.gauge / C.laguzGauge.max) * 100 + "%";
     $(".gauge-num", el).textContent = g.gauge;
     $(".gauge-k", el).textContent = g.transformed ? "化身中" : "化身前";
+    if (BA && anim.shown) BA.setGauge(side, { gauge: g.gauge, max: C.laguzGauge.max, transformed: g.transformed }); // v1.8.3:アニメにも化身ゲージ
     el.classList.toggle("transformed", g.transformed);
     el.classList.toggle("human", !g.transformed);
   }
@@ -2327,6 +2423,8 @@
     $("#tour-result").hidden = !inTour;
     $("#arc-result").hidden = !inArc;
     $("#tt-result").hidden = true; // v1.7.0
+    // v1.8.3:アーケードの1対1の結果に、前に遊んだアーケード3on3の相手チームが出ていた(3on3の結果の中身が残っていた)
+    $("#tt-arc-reveal").innerHTML = "";
     if (inTour) tourFinished(e, wins);
     const seq = inArc ? arcFinished(e) : null;
     // v1.6.1:アーケードのクリア・ゲームオーバーなどの演出のあとで、結果のボタンを出す
@@ -3046,7 +3144,7 @@
             : `${A_.stageName(st.stage, st)}であきらめました(${st.cleared}体を倒した)。`;
     }
     box.innerHTML = `<p class="tn-head">アーケード終了</p>
-      <div class="tn-champ">${UI.charIcon(c, "large")}<div><small>${title}</small><b>${UI.esc(c.name)}</b><span>${st.stars ? `<i class="arc-mark${st.stars >= 2 ? " arc-full" : ""}">${"★".repeat(st.stars)}</i> ` : ""}${st.cleared}体を倒した ・ コンティニュー${st.continues}回</span></div></div>
+      <div class="tn-champ arc-champ"><div class="arc-champ-icons">${UI.charIcon(c, "large")}</div><div><small>${title}</small><b>${UI.esc(c.name)}</b><span>${st.stars ? `<i class="arc-mark${st.stars >= 2 ? " arc-full" : ""}">${"★".repeat(st.stars)}</i> ` : ""}<em class="nw">${st.cleared}体を倒した</em> ・ <em class="nw">コンティニュー${st.continues}回</em></span></div></div>
       <p class="arc-note">${text}</p>
       <div class="card-actions"><button type="button" class="btn btn-main" id="btn-arc-new">新しいアーケード</button></div>`;
   }
@@ -3148,7 +3246,7 @@
         : st.stars ? `${A_.stageName(st.stage, st)}であきらめました。10体目まで勝ち抜いたので、★が付いています。`
           : `${A_.stageName(st.stage, st)}であきらめました(${st.cleared}体目まで勝った)。`;
     box.innerHTML = `<p class="tn-head">アーケード終了(3on3)</p>
-      <div class="tn-champ">${saved.map((c) => UI.charIcon(c, "large")).join("")}<div><small>${title}</small><b>${saved.map((c) => UI.esc(c.name)).join("・")}</b><span>${st.stars ? `<i class="arc-mark${st.stars >= 2 ? " arc-full" : ""}">${"★".repeat(st.stars)}</i> ` : ""}${st.cleared}体目まで勝った ・ コンティニュー${st.continues}回</span></div></div>
+      <div class="tn-champ arc-champ team"><div class="arc-champ-icons">${saved.map((c) => UI.charIcon(c, "large")).join("")}</div><div><small>${title}</small><b>${saved.map((c) => `<em class="nw">${UI.esc(c.name)}</em>`).join("・")}</b><span>${st.stars ? `<i class="arc-mark${st.stars >= 2 ? " arc-full" : ""}">${"★".repeat(st.stars)}</i> ` : ""}<em class="nw">${st.cleared}体目まで勝った</em> ・ <em class="nw">コンティニュー${st.continues}回</em></span></div></div>
       <p class="arc-note">${text}</p>
       <div class="card-actions"><button type="button" class="btn btn-main" id="btn-arc-new">新しいアーケード</button></div>`;
   }
