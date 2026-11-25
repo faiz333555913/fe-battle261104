@@ -2553,3 +2553,76 @@ html:has(#screen-battle.active), body:has(#screen-battle.active) { overflow-x: h
 .fc-witem small { display: block; font-weight: normal; font-size: .72rem; color: var(--muted); }
 .fc-witem:hover, .fc-witem:focus-visible { background: #24305e; }
 .fc-witem.on { background: #2c3a72; box-shadow: inset 3px 0 0 var(--gold); }
+
+/* =========================================================
+   v1.8.4:タイトルの背景を3枚から選ぶ(index.html の小さなスクリプトが data-bg に 1〜3 を入れる)
+   ========================================================= */
+/* 2・3枚目はガトーの素材(1376×768)をそのまま。たいまつのない絵なので、火のゆらめきは出さない */
+.tb-scene[data-bg="2"] { background-image: url("../assets/title_bg2.png"); }
+.tb-scene[data-bg="3"] { background-image: url("../assets/title_bg3.png"); }
+.tb-scene[data-bg="2"] .tb-torch, .tb-scene[data-bg="3"] .tb-torch { display: none; }
+/* 昼の絵は明るいので、まん中をもう少し暗くして文字を読みやすく */
+.title-bg:has(.tb-scene[data-bg="2"]) .tb-shade {
+  background: radial-gradient(ellipse 62% 72% at 50% 46%, rgba(8, 10, 22, .72) 0%, rgba(8, 10, 22, .5) 55%, rgba(8, 10, 22, .25) 100%); }
+.char-detail .card-actions.list-go { flex-wrap: wrap; gap: 8px; }
+
+/* v1.8.4:戦闘予測の名前の横の「化身」ボタン(ラグズ)。押すと化身後 ⇔ 化身前の予測 */
+.fc-form { display: inline-block; vertical-align: middle; margin: 0 6px; padding: 1px 8px; border-radius: 999px; cursor: pointer;
+  font-size: .72rem; font-weight: bold; line-height: 1.5; letter-spacing: .04em; white-space: nowrap;
+  color: #ffd9a0; background: rgba(120, 60, 20, .55); border: 1px solid #d08a3a; }
+.fc-form:hover { border-color: var(--gold); }
+.fc-form.on { color: #2a1200; background: linear-gradient(180deg, #ffd27a, #e08a2a); border-color: #ffe2a0; box-shadow: 0 0 8px rgba(255, 170, 60, .6); }
+.fc-head .fc-name:has(.fc-form) { overflow: visible; }
+#as-chars li, #ts-chars li, #char-list li { touch-action: manipulation; } /* v1.8.4:ダブルタップで拡大しない */
+
+/* =========================================================
+   v1.8.4:キャラ作成の右上(入力をリセット・キャラ書き出し・キャラ読み込み)と「詳しい内部データ」
+   ========================================================= */
+.create-titlebar { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--gold-soft, rgba(216, 183, 90, .5)); margin-bottom: 16px; }
+.create-titlebar .screen-title { border-bottom: 0; margin-bottom: 0; flex: 1 1 auto; }
+.create-tools { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; padding-bottom: 8px; }
+.create-tools .btn { white-space: nowrap; }
+#create-message { margin: 0 0 10px; }
+.create-internal { margin-top: 12px; font-size: 13px; }
+.create-internal summary { cursor: pointer; font-weight: bold; color: var(--gold); }
+.create-internal summary small { font-weight: normal; color: var(--muted); margin-left: 6px; }
+.create-internal h5 { margin: 14px 0 4px; font-size: 13px; color: var(--gold); border-left: 3px solid var(--gold); padding-left: 6px; }
+.create-internal .int-note { margin: 2px 0 6px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.create-internal .int-note b { color: var(--fg); }
+.create-internal code { font-size: 11px; color: var(--fg); word-break: break-all; }
+.int-pool { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.int-pool li { display: inline-flex; gap: 6px; align-items: baseline; padding: 2px 8px; border-radius: 6px; background: rgba(255, 255, 255, .05); border: 1px solid var(--line); font-size: 12px; }
+.int-pool li b { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: normal; }
+.int-pool li.on { border-color: var(--gold); background: rgba(216, 183, 90, .16); color: #ffe7a0; }
+.int-pool li.on b { color: #ffe7a0; font-weight: bold; }
+.int-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; table-layout: fixed; }
+.int-table th, .int-table td { padding: 2px 3px; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, .06); }
+.int-table tr > th:first-child { text-align: left; white-space: nowrap; color: var(--muted); font-weight: normal; width: 7.5em; overflow: hidden; text-overflow: ellipsis; }
+.int-table tr:first-child th { color: var(--muted); font-weight: normal; }
+.int-table tr.sum td { font-weight: bold; color: var(--fg); border-top: 1px solid var(--line); }
+.int-table tr.sum th { color: var(--gold); }
+.int-table s { color: #ff8a7a; }
+.int-lv td { color: #8fe07a; }
+@media (max-width: 600px) {
+  .create-tools { width: 100%; justify-content: flex-start; padding-bottom: 6px; }
+  .create-tools .btn { flex: 1 1 auto; font-size: 12px; padding: 6px 6px; }
+  .int-table { font-size: 10.5px; }
+  .int-table tr > th:first-child { width: 5.4em; }
+}
+
+/* v1.8.4:はみ出しの修正。スマホ横向きのバトル準備で「⚙ 対戦の設定」のスイッチ4つが1行に入らず、
+   「スキル選択」「戦闘アニメ」が右の2Pの欄の下にはみ出していた → 2つずつ2行に(横向きだけ。縦向きは⚙のシートなので関係なし)
+   ※メディアの書き方を (max-height) から始めているのは、tools/build_portrait_css.py が縦向きへコピーしないため */
+@media (max-height: 500px) and (orientation: landscape) {
+  .battle-options .bo-row:has(.fx-toggle) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 6px; }
+  .battle-options .bo-row .fx-toggle { min-width: 0; overflow: hidden; }
+}
+/* v1.8.4:はみ出しの修正。武器の種類が2文字(軽器)のとき、スマホの小さな円からはみ出していた → 2文字は横長の札に */
+@media (max-height: 500px) and (orientation: landscape), (orientation: portrait) and (max-width: 600px) {
+  .weapon-head .wtype.w2 { width: auto; min-width: 16px; padding: 0 4px; border-radius: 8px; white-space: nowrap; }
+}
+/* v1.8.4:明るい背景(昼・夕方)だと、上の帯(ボタン用の暗いグラデーション)が目立つので、タイトルでは消す */
+body:has(#screen-title.active) .topbar { background: none; }
+.fc-head .fc-k { white-space: nowrap; } /* v1.8.4:名前の横に「化身」ボタンが入っても「戦闘予測」を1行に */
+@media (orientation: portrait) and (max-width: 600px) { .fc-form { margin: 0 4px; padding: 1px 6px; font-size: 11px; } }

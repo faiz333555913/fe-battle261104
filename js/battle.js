@@ -260,7 +260,9 @@
     const s = curStats(u, enemy);
     const carry = C.magicCategories.includes(u.weapon.category) ? s.spd : s.str;
     // v1.4.4:手斧・手槍系の「相手の攻速-2」は廃止(ダメージを与えると相手の速さ-1 に変更。strike で処理)
-    return Math.max(0, s.spd - Math.max(0, u.weapon.weight - carry));
+    // v1.8.4:『挑発』相手(挑発された側)の攻速-3(命中-10と同じく、護り手・安定には効かない)
+    const taunted = enemy && hasSkill(enemy, u, "挑発") && !resistsDown(u, enemy) ? C.taunt.as : 0;
+    return Math.max(0, s.spd - Math.max(0, u.weapon.weight - carry) - taunted);
   }
   const classCrit = (u) => C.classCritBonus[DB.baseClassName(u.className)] || 0;
 

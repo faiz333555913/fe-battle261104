@@ -251,3 +251,106 @@
   .tt-cover-title { font-size: 2rem; }
   #tt-skipall { order: 3; }
 }
+
+/* v1.8.4:バトルのまん中(○本先取・ROUND・VS)のバランス。
+   左に小さく「2本先取・第3試合」+大きく「1 - 2」、右に ROUND・VS が並んで、全体が右に寄って見えていた →
+   3つの欄(左:先取 / まん中:ROUND / 右:VS)にして ROUND を画面のまん中に。先取は1行(字の大きさを ROUND とそろえる) */
+@media (orientation: portrait) and (max-width: 600px) {
+  .arena-mid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 2px 4px; }
+  .arena-mid .set-score { grid-column: 1; justify-self: end; flex-wrap: nowrap; align-items: baseline; gap: 0 3px; white-space: nowrap; }
+  .arena-mid .set-score small { flex-basis: auto; font-size: 10px; margin-right: 4px; line-height: 1.2; text-align: right; }
+  .arena-mid .set-score b { font-size: 18px; }
+  .arena-mid .round-label { grid-column: 2; }
+  .arena-mid .vs { grid-column: 3; justify-self: start; }
+}
+
+/* v1.8.4:スマホ縦の「タイトルへ戻る」が小さかった → 文字と押せる範囲を大きくし、その分バトル準備・バトルの画面を少し下へ */
+@media (orientation: portrait) and (max-width: 600px) {
+  body:has(#screen-prep.active) .topbar .link-btn,
+  body:has(#screen-battle.active) .topbar .link-btn {
+    top: calc(6px + env(safe-area-inset-top)); font-size: 13px; padding: 5px 14px; line-height: 1.4;
+  }
+  body:has(#screen-prep.active) #app,
+  body:has(#screen-battle.active) #app { padding-top: calc(48px + env(safe-area-inset-top)); }
+  #screen-battle.active { height: calc(100dvh - 48px - env(safe-area-inset-top)); }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  body:has(#screen-battle.active) .arcstats-btn { font-size: 13px; padding: 0 12px; }
+}
+
+/* =========================================================
+   v1.8.4:スマホ縦の「その場の能力値パネル」(最優先の改善)
+   キャラ一覧・トーナメント・アーケード・3on3の準備で、押したキャラの能力値と武器を画面の下に固定して出す。
+   キャラの並びは2列。PC・横向きではパネルを出さない(今までどおり)
+   ========================================================= */
+.pk-dock, .pk-detail-close { display: none; }
+@media (orientation: portrait) and (max-width: 600px) {
+  body.pk-on .pk-dock:not([hidden]) {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
+    padding: 8px calc(10px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));
+    background: linear-gradient(180deg, #1b2448, #10162c); border-top: 2px solid var(--gold);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, .6); max-height: 52vh; overflow-y: auto;
+  }
+  body.pk-on #app { padding-bottom: calc(var(--pk-h, 0px) + 16px); }
+  body.pk-on .ts-start { padding-bottom: 4px; }
+
+  .pk-card { font-size: 12px; line-height: 1.3; }
+  .pk-head { display: flex; align-items: center; gap: 8px; }
+  .pk-head .char-icon.small { flex: none; }
+  .pk-title { min-width: 0; flex: 1; }
+  .pk-name { font-size: 15px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pk-class { font-size: 11px; font-weight: normal; color: var(--gold); margin-left: 6px; }
+  .pk-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 4px; margin-top: 2px; }
+  .pk-badges .badge, .pk-badges .race-chip { font-size: 10px; }
+  .pk-badges .element-chip { font-size: 10px; }
+  /* 化身前/化身後のスイッチは属性の右(ガトー指示) */
+  .pk-badges .form-switch { margin-left: 2px; font-size: 10px; gap: 3px; }
+  .pk-note { flex: none; align-self: flex-start; font-size: 10px; color: var(--muted); text-align: right; }
+  .pk-note b { color: var(--gold); }
+  .pk-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px 10px; margin: 6px 0 4px; }
+  .pk-stat { display: grid; grid-template-columns: 2.6em 1.9em minmax(0, 1fr); align-items: center; gap: 4px; }
+  .pk-k { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .pk-v { text-align: right; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .pk-stat.capped .pk-v { color: #b8f05a; text-shadow: 0 0 6px rgba(184, 240, 90, .45); }
+  .pk-bar { height: 5px; background: rgba(255, 255, 255, .08); border-radius: 3px; overflow: hidden; }
+  .pk-bar i { display: block; height: 100%; background: linear-gradient(90deg, #3d5bd8, #7c9cff); }
+  .pk-stat.capped .pk-bar i { background: linear-gradient(90deg, #8bd43a, #c8f27a); }
+  .pk-bar.pk-nobar { background: none; }
+  .pk-weapons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .pk-w { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; padding: 2px 6px; background: rgba(255, 255, 255, .04); border-radius: 5px; }
+  .pk-wn { font-weight: bold; white-space: nowrap; }
+  .pk-wn .stars { font-size: 9px; margin-left: 2px; }
+  .pk-ws { color: var(--fg); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pk-we { flex-basis: 100%; font-size: 10px; color: #f0c86a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pk-actions { display: flex; gap: 6px; margin-top: 6px; }
+  .pk-actions .btn { flex: 1; padding: 7px 4px; font-size: 12px; min-height: 0; }
+
+  /* キャラの並びは2列(1画面に多く入るように) */
+  body.pk-on .char-list, body.pk-on .ts-chars, body.pk-on .asetup .ts-chars, body.pk-on .ttsetup .ts-chars {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; max-height: none; overflow: visible; }
+  body.pk-on .char-list li, body.pk-on .ts-chars li { padding: 5px 7px; gap: 7px; min-width: 0; }
+  body.pk-on .char-list .li-text { min-width: 0; }
+  body.pk-on .char-list .li-name, body.pk-on .char-list .li-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.pk-on .char-list li.empty, body.pk-on .ts-chars li.empty { grid-column: 1 / -1; }
+  body.pk-on .ts-chars li .ts-no { top: 3px; right: 4px; }
+
+  /* キャラ一覧:詳細は「くわしく」で上に重ねて開く(閉じるで戻る) */
+  #screen-list .char-detail { display: none; }
+  #screen-list.pk-detail-open .char-detail {
+    display: block; position: fixed; inset: 0; z-index: 70; overflow-y: auto; background: rgba(8, 10, 22, .97);
+    padding: calc(10px + env(safe-area-inset-top)) 10px calc(16px + env(safe-area-inset-bottom)); }
+  #screen-list.pk-detail-open .pk-detail-close { display: block; margin: 0 0 8px auto; padding: 6px 16px; font-size: 13px; }
+  /* アーケード(1対1・アイク)の準備:下のパネルが同じ中身なので、詳細の箱は出さない(3on3のチームの箱は残す) */
+  #asetup:not(.team) .as-detail { display: none; }
+}
+
+/* v1.8.4:ラグズの化身前/化身後のスイッチ。スマホ縦は属性の右(ガトー指示)、PC・横向きは今までどおり「1P」の横 */
+.stat-element .form-switch { display: none; }
+@media (orientation: portrait) and (max-width: 600px) {
+  .prep-side .side-top .form-switch { display: none; }
+  .prep-side .stat-element .form-switch { display: inline-flex; margin-left: 6px; font-size: 11px; }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .prep-side .stat-element { display: flex; align-items: center; gap: 6px; }
+  .prep-side .stat-element .stat-k { flex: none; width: 2.4em; }
+}

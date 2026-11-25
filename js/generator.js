@@ -61,8 +61,10 @@
 
   // ---- 生成 ----
   // inputs は normalizeInputs 済みのもの
-  function generateCharacter(inputs) {
+  // v1.8.4:trace にオブジェクトを渡すと、どう決まったか(内部データ)を書きこむ(キャラ作成の「詳しい内部データ」)。結果は変わらない
+  function generateCharacter(inputs, trace) {
     const key = seedKey(inputs);
+    const T = trace || null;
     const rng = global.Rng.createSeededRng(key);
     const day = +inputs.birthdate.slice(6, 8);
 
@@ -71,8 +73,18 @@
 
     // 職業:性別・種族で絞り、好きな色で出やすさに偏り
     const colorDef = C.colors.find((c) => c.name === inputs.color);
-    const cls = rng.weightedPick(classPool(inputs.gender, inputs.race), (c) =>
-      c.groups.some((g) => colorDef.bias.includes(g)) ? C.colorBiasWeight : 1);
+    const classWeight = (c) => (c.groups.some((g) => colorDef.bias.includes(g)) ? C.colorBiasWeight : 1);
+    const cls = rng.weightedPick(classPool(inputs.gender, inputs.race), classWeight);
+    if (T) {
+      T.seedKey = key;
+      T.colorBias = colorDef.bias.slice();
+      T.classPool = classPool(inputs.gender, inputs.race).map((c) => ({ name: c.name, weight: classWeight(c) }));
+      T.className = cls.name;
+      const ew = C.elementWeights, sum = Object.values(ew).reduce((a, b) => a + b, 0);
+      T.elementPool = Object.keys(ew).map((e) => ({ name: e, weight: ew[e], pct: Math.round((ew[e] / sum) * 1000) / 10 }));
+      T.element = element;
+      T.growth = {}; T.base = {}; T.levelUps = [];
+    }
     const isLaguz = cls.race === "ラグズ";
 
     // 成長の傾向:好きな漢字の文字コード
@@ -81,32 +93,44 @@
     // 成長率 = 職業の成長率 + 個人差 + 漢字の傾向 + 属性の傾向
     const growth = {};
     for (const k of DB.STAT_KEYS) {
-      let g = cls.growth[k] + rng.int(C.personalGrowthRange[0], C.personalGrowthRange[1]);
-      if (kanjiType.up.includes(k)) g += C.kanjiGrowthUp;
-      if (kanjiType.down === k) g -= C.kanjiGrowthDown;
-      if (C.elementGrowthBonus[element] === k) g += 5;
+      const personal = rng.int(C.personalGrowthRange[0], C.personalGrowthRange[1]);
+      let g = cls.growth[k] + personal;
+      const kj = (kanjiType.up.includes(k) ? C.kanjiGrowthUp : 0) - (kanjiType.down === k ? C.kanjiGrowthDown : 0);
+      const el = C.elementGrowthBonus[element] === k ? 5 : 0;
+      g += kj + el;
       growth[k] = Math.max(5, g);
+      if (T) T.growth[k] = { cls: cls.growth[k], personal, kanji: kj, element: el, total: growth[k] };
     }
+    if (T) T.kanjiType = { name: kanjiType.name, up: kanjiType.up.slice(), down: kanjiType.down, code: inputs.kanji.codePointAt(0) };
 
     // Lv1:職業の基本値 + 個人差(幸運には誕生日の補正)。ラグズは化身前の値
     const stats = {};
     for (const k of DB.STAT_KEYS) {
-      stats[k] = cls.base[k] + rng.int(0, k === "hp" ? C.personalBaseMax + 1 : C.personalBaseMax);
+      const roll = rng.int(0, k === "hp" ? C.personalBaseMax + 1 : C.personalBaseMax);
+      stats[k] = cls.base[k] + roll;
+      if (T) T.base[k] = { cls: cls.base[k], personal: roll, day: 0, max: cls.max[k] };
     }
     stats.lck += day % 3;
-    for (const k of DB.STAT_KEYS) stats[k] = Math.min(stats[k], cls.max[k]);
+    if (T) T.base.lck.day = day % 3;
+    for (const k of DB.STAT_KEYS) { stats[k] = Math.min(stats[k], cls.max[k]); if (T) T.base[k].total = stats[k]; }
     const statsLv1 = { ...stats }; // v1.4.0:レベルアップ演出用(Lv1の値。ラグズは化身前)
 
     // レベルアップを再現(上限で頭打ち)。ベオクはLv20、ラグズはLv10相当
     const levelUps = isLaguz ? C.laguzLevelUps : C.levelUps;
     for (let lv = 0; lv < levelUps; lv++) {
+      const row = {};
       for (const k of DB.STAT_KEYS) {
         const g = growth[k];
         const gain = Math.floor(g / 100) + (rng.percent(g % 100) ? 1 : 0);
+        const before = stats[k];
         stats[k] = Math.min(stats[k] + gain, cls.max[k]);
+        row[k] = { gain, got: stats[k] - before }; // got:上限で止まった分は gain より小さい
       }
+      if (T) T.levelUps.push(row);
     }
-    const con = cls.con + rng.int(0, 1);
+    const conRoll = rng.int(0, 1);
+    const con = cls.con + conRoll;
+    if (T) T.con = { cls: cls.con, personal: conRoll, total: con };
 
     // 武器:ラグズは固定の1つ。ベオクは使えるカテゴリから、レア度に応じて抽選(重複なし)
     let weapons;
@@ -119,6 +143,11 @@
       const prefix = Object.keys(C.weaponCountByClassPrefix).find((p) => cls.name.startsWith(p));
       const count = Math.min(prefix ? C.weaponCountByClassPrefix[prefix] : C.weaponCountDefault, pool.length);
       const picked = [];
+      if (T) {
+        const sum = pool.reduce((a, w) => a + DB.weaponRarity(w), 0);
+        T.weaponPool = pool.map((w) => ({ id: w.id, name: w.name, weight: DB.weaponRarity(w), pct: Math.round((DB.weaponRarity(w) / sum) * 1000) / 10 }));
+        T.weaponCount = count;
+      }
       for (let i = 0; i < count; i++) {
         const w = rng.weightedPick(pool, DB.weaponRarity);
         picked.push(w);
@@ -153,7 +182,10 @@
     if (isLaguz) {
       char.statsHuman = { ...stats, con };
       for (const k of DB.STAT_KEYS) char.stats[k] = Math.min(stats[k] + cls.transform[k], cls.transformedMax[k]);
+      if (T) T.transform = DB.STAT_KEYS.reduce((o, k) => { o[k] = { human: stats[k], plus: cls.transform[k], max: cls.transformedMax[k], total: char.stats[k] }; return o; }, {});
+      if (T) T.gauge = { lck: stats.lck, bonus: cls.gaugeBonus || 0, total: Math.min(C.laguzGauge.max, stats.lck + (cls.gaugeBonus || 0)) };
     }
+    if (T) { T.id = char.id; T.version = GENERATOR_VERSION; T.marks = char.marks; T.isLaguz = isLaguz; T.levelUpsCount = levelUps; T.weapons = weapons.slice(); }
     return char;
   }
 

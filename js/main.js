@@ -40,6 +40,8 @@
     arcStatsSync(); // v1.8.2
     if (name === "howto") $("#screen-howto").scrollTop = 0;
     if (name === "data") renderData(); // v1.6.4
+    $("#screen-list").classList.remove("pk-detail-open");
+    if (typeof pkRefresh === "function") pkRefresh(); // v1.8.4:スマホ縦の能力値パネル
     window.scrollTo(0, 0);
   }
 
@@ -404,15 +406,73 @@
     form.elements.name.value = res.value.name;
     form.elements.kanji.value = res.value.kanji;
     form.elements.birthdate.value = res.value.birthdate;
-    lastGenerated = G.generateCharacter(res.value);
+    const trace = {};
+    lastGenerated = G.generateCharacter(res.value, trace);
     const saved = !!S.find(lastGenerated.id);
     $("#create-result").innerHTML = `<div class="reveal">${UI.charCard(lastGenerated, `
       <div class="card-actions">
         <button type="button" class="btn btn-main" id="btn-save" ${saved ? "disabled" : ""}>${saved ? "保存済み" : "このキャラを保存"}</button>
         <span class="message" id="save-message"></span>
-      </div>`)}</div>`;
+      </div>`)}${internalHtml(lastGenerated, trace)}</div>`;
     if (luToggle.checked) playLevelUp(lastGenerated);
   });
+
+  // v1.8.4:入力のリセット(名前・性別・種族・漢字・色・生年月日を消し、結果も消す)
+  $("#btn-create-reset").addEventListener("click", () => {
+    form.reset();
+    randomFilled.clear();
+    $$("[data-error]", form).forEach((el) => { el.textContent = ""; });
+    updateRaceNote();
+    lastGenerated = null;
+    $("#create-result").innerHTML = `<p class="hint">4つの項目を入力すると、キャラが生まれます。<br>同じ入力からは、いつも同じキャラが生まれます。</p>`;
+    listMessage("入力をリセットしました。");
+    try { luToggle.checked = global.localStorage.getItem(LU_KEY) !== "off"; } catch (e) { /* そのまま */ }
+  });
+
+  // v1.8.4:キャラ作成の「詳しい内部データ」(ガトー指示)。生み出すときの計算(generator.js の trace)をそのまま表にする。
+  //   乱数のもと・職業と属性の抽選の確率・成長率とLv1の内訳・レベルアップ1回ずつの上がり方・化身・武器の抽選の確率・錬成
+  function internalHtml(char, T) {
+    if (!T || !T.growth) return "";
+    const E = UI.esc, keys = DB.STAT_KEYS, L = DB.STAT_LABELS;
+    const sg = (v) => (v > 0 ? `+${v}` : v < 0 ? `${v}` : "0");
+    const pct = (list) => { const sum = list.reduce((a, x) => a + x.weight, 0); return list.map((x) => ({ ...x, pct: x.pct != null ? x.pct : Math.round((x.weight / sum) * 1000) / 10 })); };
+    const pool = (list, isChosen) => `<ul class="int-pool">${pct(list).map((x) => `<li class="${isChosen(x) ? "on" : ""}"><span>${E(x.name)}</span><b>${x.pct}%</b></li>`).join("")}</ul>`;
+    const head = `<tr><th></th>${keys.map((k) => `<th>${L[k]}</th>`).join("")}</tr>`;
+    const row = (label, f, cls = "") => `<tr class="${cls}"><th>${label}</th>${keys.map((k) => `<td>${f(k)}</td>`).join("")}</tr>`;
+    const kt = T.kanjiType;
+    const growth = `<table class="int-table">${head}
+      ${row("職業", (k) => T.growth[k].cls)}
+      ${row("個人差", (k) => sg(T.growth[k].personal))}
+      ${row(`漢字(${E(kt.name)})`, (k) => (T.growth[k].kanji ? sg(T.growth[k].kanji) : ""))}
+      ${row(`属性(${E(T.element)})`, (k) => (T.growth[k].element ? sg(T.growth[k].element) : ""))}
+      ${row("成長率", (k) => `${T.growth[k].total}%`, "sum")}</table>`;
+    const base = `<table class="int-table">${head}
+      ${row("職業の基本", (k) => T.base[k].cls)}
+      ${row("個人差", (k) => sg(T.base[k].personal))}
+      ${row("誕生日", (k) => (T.base[k].day ? sg(T.base[k].day) : ""))}
+      ${row("上限", (k) => T.base[k].max)}
+      ${row("Lv1", (k) => T.base[k].total, "sum")}</table>`;
+    const lvRows = T.levelUps.map((r, i) => row(`Lv${2 + i}`, (k) => (r[k].gain ? (r[k].got < r[k].gain ? `<s title="上限で止まった">+${r[k].gain}</s>` : `+${r[k].gain}`) : "")));
+    const total = row("合計", (k) => `+${T.levelUps.reduce((a, r) => a + r[k].got, 0)}`, "sum");
+    const last = row(T.isLaguz ? "化身前" : `Lv${1 + T.levelUps.length}`, (k) => (T.isLaguz ? char.statsHuman[k] : char.stats[k]), "sum");
+    const lvTable = `<table class="int-table int-lv">${head}${lvRows.join("")}${total}${last}</table>`;
+    const tf = T.transform ? `<h5>化身(ラグズ)</h5><table class="int-table">${head}
+      ${row("化身前", (k) => T.transform[k].human)}${row("化身で", (k) => sg(T.transform[k].plus))}${row("化身後の上限", (k) => T.transform[k].max)}${row("化身後", (k) => T.transform[k].total, "sum")}</table>
+      <p class="int-note">化身ゲージの初期値:化身前の幸運 ${T.gauge.lck} + 職業の分 ${T.gauge.bonus} = <b>${T.gauge.total}</b>(20で化身)</p>` : "";
+    const wpool = T.weaponPool ? `<h5>武器の抽選(${T.weaponCount}本・同じ武器は出ない)</h5><p class="int-note">1本目を引くときの確率(★が多いほど出にくい)。金色が持っている武器</p>${pool(T.weaponPool, (x) => T.weapons.includes(x.id))}`
+      : `<h5>武器</h5><p class="int-note">ラグズは職業で決まった武器(${E(T.weapons.map((id) => (DB.weapons[id] || {}).name || id).join("・"))})</p>`;
+    const mk = Object.entries(T.marks || {});
+    const marks = `<h5>錬成</h5><p class="int-note">${mk.length ? mk.map(([id, m]) => `${E((DB.weapons[id] || {}).name || id)}:威力${sg(m.might)}・命中${sg(m.hit)}・必殺${sg(m.crit)}・重さ${sg(m.weight)}`).join("<br>") : "なし(★の多い武器があるとき・錬成できる武器がないときはつかない)"}</p>`;
+    return `<details class="panel create-internal"><summary>詳しい内部データ<small>(どう決まったか)</small></summary>
+      <h5>乱数のもと</h5><p class="int-note"><code>${E(T.seedKey)}</code><br>キャラID ${E(T.id)}(作り方の版 v${E(T.version)})。同じ入力なら、いつも同じ結果</p>
+      <h5>職業の抽選</h5><p class="int-note">性別・種族で選べる職業から。好きな色「${E(char.inputs.color)}」で出やすい系統(${E(T.colorBias.join("・"))})は ${C.colorBiasWeight}倍</p>${pool(T.classPool, (x) => x.name === T.className)}
+      <h5>属性の抽選</h5><p class="int-note">入力すべてから決まる別の乱数(誕生日だけでは決まらない)</p>${pool(T.elementPool, (x) => x.name === T.element)}
+      <h5>成長率の内訳</h5><p class="int-note">好きな漢字「${E(char.inputs.kanji)}」(文字コード ${kt.code})→「${E(kt.name)}」:${E(kt.up.map((k) => L[k]).join("・"))}+${C.kanjiGrowthUp}${kt.down ? `・${E(L[kt.down])}-${C.kanjiGrowthDown}` : ""}。属性で1つの能力+5</p>${growth}
+      <h5>Lv1の能力値</h5><p class="int-note">職業の基本値 + 個人差。幸運には誕生日(日 ÷ 3 の余り)を足す${T.isLaguz ? "(ラグズは化身前の値)" : ""}</p>${base}
+      <h5>レベルアップ(${T.levelUps.length}回)</h5><p class="int-note">1回ごとに、成長率の%で+1(100%を超える分は必ず+1)。<s>線</s>は上限で止まった分。体格は職業の ${T.con.cls} + 個人差 ${T.con.personal} = ${T.con.total}</p>${lvTable}
+      ${tf}${wpool}${marks}
+    </details>`;
+  }
 
   // ================= レベルアップ演出(v1.4.0) =================
   // Lv1 → Lv20(ラグズはLv10)。上がった能力を1つずつ「+N ▲」で見せる。タップで飛ばす/閉じる
@@ -504,14 +564,20 @@
         </li>`).join("")
       : `<li class="empty">まだキャラがいません。<button type="button" class="link-btn" data-goto="create">キャラ作成</button>から作ってみましょう。</li>`;
     const sel = chars.find((c) => c.id === selectedId);
+    // v1.8.4:そのキャラで闘技場(1対1)・アーケード(1対1)へ行けるボタン。スマホ縦では、下の能力値パネルの「くわしく」でこの詳細が開く(閉じるボタンつき)
+    const go = sel && !isBanned(sel) ? `<button type="button" class="btn btn-main" data-golist="arena">このキャラで闘技場(1対1)</button><button type="button" class="btn btn-main" data-golist="arcade">このキャラでアーケード(1対1)</button>` : "";
     $("#char-detail").innerHTML = sel
-      ? `${UI.charCard(sel)}<div class="card-actions"><button type="button" class="btn btn-danger" id="btn-delete" data-id="${UI.esc(sel.id)}">このキャラを削除</button></div>`
+      ? `<button type="button" class="btn pk-detail-close">✕ 閉じる</button>${UI.charCard(sel)}<div class="card-actions list-go">${go}</div><div class="card-actions"><button type="button" class="btn btn-danger" id="btn-delete" data-id="${UI.esc(sel.id)}">このキャラを削除</button></div>`
       : "";
+    pkRefresh();
   }
+  // v1.8.4:キャラ作成の画面にも書き出し・読み込みがあるので、メッセージは両方の画面に出す
   function listMessage(text) {
-    const m = $("#list-message");
-    m.textContent = text;
-    m.hidden = !text;
+    for (const m of [$("#list-message"), $("#create-message")]) {
+      if (!m) continue;
+      m.textContent = text;
+      m.hidden = !text;
+    }
   }
   $("#list-sort").addEventListener("change", (e) => { listSort = e.target.value; renderList(); });
   $("#char-list").addEventListener("click", (e) => {
@@ -525,6 +591,8 @@
     if (li && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); selectedId = li.dataset.id; renderList(); }
   });
   $("#char-detail").addEventListener("click", (e) => {
+    const go = e.target.closest("[data-golist]");
+    if (go) { goFromList(go.dataset.golist, selectedId); return; }
     const btn = e.target.closest("#btn-delete");
     if (!btn) return;
     if (btn.dataset.confirm !== "1") { // 1回目は確認
@@ -537,6 +605,8 @@
     listMessage(`${c ? c.name : "キャラ"}を削除しました。`);
     renderList();
   });
+  // v1.8.4:キャラ作成の右上の「キャラ書き出し」もキャラ一覧の「書き出し」と同じ
+  $("#btn-export-c").addEventListener("click", () => $("#btn-export").click());
   $("#btn-export").addEventListener("click", () => {
     if (!S.list().length) { listMessage("書き出すキャラがいません。"); return; }
     exportFile();
@@ -555,7 +625,8 @@
   // v1.4.3:キャラを作って書き出しをしていないまま、キャラ一覧から「タイトルへ戻る」を押したら確認する
   const warnBox = $("#export-warn");
   $("#nav-home").addEventListener("click", (e) => {
-    if (!$("#screen-list").classList.contains("active") || !S.hasUnexported()) return;
+    // v1.8.4:キャラ作成の画面から戻るときも同じ確認(ガトー指示)
+    if (!($("#screen-list").classList.contains("active") || $("#screen-create").classList.contains("active")) || !S.hasUnexported()) return;
     e.stopPropagation(); // タイトルへはまだ戻らない
     warnBox.hidden = false;
   }, true);
@@ -572,7 +643,8 @@
   // 新しいキャラだけにチェックが入っていて、外すと読み込まない
   const importBox = $("#import-check");
   let importText = null;
-  $("#input-import").addEventListener("change", (e) => {
+  // v1.8.4:キャラ作成の右上の「キャラ読み込み」(#input-import-c)も同じ
+  const onImportFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -589,7 +661,9 @@
       showImportPlan(plan);
     };
     reader.readAsText(file);
-  });
+  };
+  $("#input-import").addEventListener("change", onImportFile);
+  $("#input-import-c").addEventListener("change", onImportFile);
   function showImportPlan(plan) {
     const fresh = plan.items.filter((x) => x.state === "new").length;
     const cnt = (st) => plan.items.filter((x) => x.state === st).length;
@@ -704,8 +778,8 @@
   function randomFoeOptions(side, char) {
     if (side !== "right" || tourMatch || arcMatch) return "";
     const g = prep.right.gen;
-    return (g ? `<option value="${GEN_FOE}" selected>${UI.esc(char.name)}(${UI.esc(char.className)})※ランダム</option>` : "")
-      + `<option value="${RANDOM_FOE}">${g ? "🎲 別のキャラをランダムで生み出す" : "🎲 ランダムに生まれたキャラ"}</option>`;
+    return `<option value="${RANDOM_FOE}">${g ? "🎲 別のキャラをランダムで生み出す" : "🎲 ランダムに生まれたキャラ"}</option>`
+      + (g ? `<option value="${GEN_FOE}" selected>${UI.esc(char.name)}(${UI.esc(char.className)})※ランダム</option>` : "");
   }
   function prepUnits() {
     const l = charFor("left"), r = charFor("right");
@@ -814,9 +888,9 @@
       const me = side === "left" ? L : R;
       const foe = side === "left" ? R : L;
       const char = me.char;
-      const options = arcMatch ? `<option selected>${UI.esc(char.name)}(${UI.esc(char.className)} Lv${char.arcadeLv})${side === "right" ? " ※敵" : ""}</option>` : (tourMatch ? chars.filter((c) => c.id === char.id) : chars).map((c) => isBanned(c)
+      const options = arcMatch ? `<option selected>${UI.esc(char.name)}(${UI.esc(char.className)} Lv${char.arcadeLv})${side === "right" ? " ※敵" : ""}</option>` : randomFoeOptions(side, char) + (tourMatch ? chars.filter((c) => c.id === char.id) : chars).map((c) => isBanned(c)
         ? `<option value="${UI.esc(c.id)}" disabled>${UI.esc(c.name)}(${UI.esc(c.className)})※出禁</option>`
-        : `<option value="${UI.esc(c.id)}" ${c.id === char.id && !prep[side].gen ? "selected" : ""}>${UI.esc(c.name)}(${UI.esc(c.className)})</option>`).join("") + randomFoeOptions(side, char);
+        : `<option value="${UI.esc(c.id)}" ${c.id === char.id && !prep[side].gen ? "selected" : ""}>${UI.esc(c.name)}(${UI.esc(c.className)})</option>`).join(""); // v1.8.4:「🎲 ランダム」は一番上に(ガトー指示)
       // v1.6.0:アーケードの敵は武器が決まっている(その武器だけ出す)
       const weapons = char.weapons.filter((id) => !(arcMatch && side === "right" && id !== me.weapon.id)).map((id) => {
         const w = UI.charWeapon(char, id);
@@ -834,8 +908,8 @@
           <div class="side-top"><p class="side-label">${side === "left" ? "1P" : "2P"}</p>${formToggle(side, char)}</div>
           <select class="char-select" data-side="${side}" ${tourMatch || arcMatch ? "disabled" : ""}>${options}</select>
           ${UI.fighterHeader(char, { bio: me.bio, hideWeak: true, noIconWeapon: true })}
-          ${UI.statGrid(char, { element: true, form: view, foeElement: foe.char.element })}
-          <h4 class="sub weapon-head">この対戦で使う武器<span class="wtype" title="武器の種類">${UI.esc(UI.weaponTypeLabel(char, me.weapon.id))}</span></h4>
+          ${UI.statGrid(char, { element: true, form: view, foeElement: foe.char.element, afterElement: formToggle(side, char) })}
+          <h4 class="sub weapon-head">この対戦で使う武器<span class="wtype${Array.from(UI.weaponTypeLabel(char, me.weapon.id)).length > 1 ? " w2" : ""}" title="武器の種類">${UI.esc(UI.weaponTypeLabel(char, me.weapon.id))}</span></h4>
           <div class="weapon-list">${weapons}</div>
           ${skillPickHtml(side, me)}${carrySkillHtml(me)}
         </div>`;
@@ -843,15 +917,33 @@
     // 予測:ラグズは切り替えボタンの表示(化身前/化身後)で計算する
     renderForecast($("#forecast"), viewUnit(L, "left"), viewUnit(R, "right"), { L, R });
     $("#btn-start").disabled = false;
+    prepAlign();
   }
+  // v1.8.4:PC・iPad横向きで、1Pと2Pの欄の高さをそろえる(ガトー指示「1Pと2Pの画面が一致していない」)。
+  //   武器の数・バイオリズムの文の長さ・ラグズのスイッチの有無で、見出し・能力値・武器・スキルの位置が左右でずれていた。
+  //   それぞれの段の高さを、左右の高いほうに合わせる(スマホ縦は1人ずつ見るので合わせない)
+  const PREP_ROWS = [".side-top", ".fighter-head", ".stat-grid", ".weapon-head", ".weapon-list"];
+  function prepAlign() {
+    const sides = ["left", "right"].map((sd) => $(`.prep-side[data-side="${sd}"] .panel`));
+    if (sides.some((x) => !x)) return;
+    const portrait = global.matchMedia && global.matchMedia("(orientation: portrait) and (max-width: 600px)").matches;
+    for (const sel of PREP_ROWS) {
+      const els = sides.map((x) => $(sel, x));
+      els.forEach((e) => { if (e) e.style.minHeight = ""; });
+      if (portrait || els.some((e) => !e)) continue;
+      const h = Math.max(...els.map((e) => e.getBoundingClientRect().height));
+      els.forEach((e) => { e.style.minHeight = Math.ceil(h) + "px"; });
+    }
+  }
+  global.addEventListener("resize", () => { if ($("#screen-prep").classList.contains("active")) prepAlign(); });
 
   // 化身前/化身後の切り替え:能力値のバーと数字を動かし、予測を更新する
   function switchView(side, view) {
     if (prep[side].view === view) return;
     prep[side].view = view;
     const panel = $(`.prep-side[data-side="${side}"]`);
-    const sw = $(".form-switch", panel);
-    if (sw) { sw.dataset.view = view; $(".form-check", sw).checked = view === "transformed"; }
+    // v1.8.4:スイッチは2つ(PC・横向きは「1P」の横、スマホ縦は属性の右)
+    $$(".form-switch", panel).forEach((sw) => { sw.dataset.view = view; $(".form-check", sw).checked = view === "transformed"; });
     const char = charFor(side);
     const { stats, max } = UI.formStats(char, view);
     for (const k of DB.STAT_KEYS) {
@@ -961,9 +1053,9 @@
     const plan = pl || pr ? `${row("化身<br>予定", planText(pl), planText(pr), "fc-plan")}<p class="fc-note">※ダメージを受けると早まります</p>` : "";
     el.innerHTML = `
       <div class="fc-head">
-        <span class="fc-name">${UI.esc(L.name)}${f.right.effective ? '<span class="danger" title="相手の武器が特効">⚠</span>' : ""}</span>
+        <span class="fc-name">${UI.esc(L.name)}${f.right.effective ? '<span class="danger" title="相手の武器が特効">⚠</span>' : ""}${fcFormBtn(el, "left", L)}</span>
         <span class="fc-k">戦闘予測</span>
-        <span class="fc-name">${f.left.effective ? '<span class="danger" title="相手の武器が特効">⚠</span>' : ""}${UI.esc(R.name)}</span>
+        <span class="fc-name">${fcFormBtn(el, "right", R)}${f.left.effective ? '<span class="danger" title="相手の武器が特効">⚠</span>' : ""}${UI.esc(R.name)}</span>
       </div>
       ${row("武器", `${fcWeaponName(el, "left", L)}${UI.triMark(f.left.tri)}`, `${UI.triMark(f.right.tri)}${fcWeaponName(el, "right", R)}`, "fc-small")}
       ${row("HP", L.hp, R.hp)}
@@ -1035,8 +1127,19 @@
     const item = e.target.closest(".fc-witem");
     if (item) { e.preventDefault(); fcChooseWeapon(item.dataset.side, item.dataset.id); return; }
     const b = e.target.closest(".fc-wbtn");
-    if (b) { e.preventDefault(); fcOpenMenu(b); }
+    if (b) { e.preventDefault(); fcOpenMenu(b); return; }
+    // v1.8.4:ラグズの名前の横の「化身」ボタンで、化身後/化身前の戦闘予測を切りかえる(能力値のスイッチと同じ)
+    const t = e.target.closest(".fc-form");
+    if (t) { e.preventDefault(); switchView(t.dataset.side, prep[t.dataset.side].view === "transformed" ? "human" : "transformed"); }
   });
+  // v1.8.4:戦闘予測の名前の横の「化身」ボタン(ラグズだけ。ずっと化身しているキャラ・アーケードの敵の化身中は出さない)
+  function fcFormBtn(el, side, u) {
+    if (el.id !== "forecast" || !u.laguz || !prep[side]) return "";
+    const c = charFor(side);
+    if (!c || !c.statsHuman || c.alwaysTransformed) return "";
+    const on = prep[side].view === "transformed";
+    return `<button type="button" class="fc-form${on ? " on" : ""}" data-side="${side}" aria-pressed="${on}" title="${on ? "押すと化身前の戦闘予測" : "押すと化身後の戦闘予測"}">${on ? "化身中" : "化身"}</button>`;
+  }
   document.addEventListener("click", (e) => { if (!e.target.closest("#forecast .fc-wmenu, #forecast .fc-wbtn")) fcCloseMenu(); });
 
   // ================= v1.6.6:スマホ縦向きのバトル準備 =================
@@ -1360,11 +1463,22 @@
       id: BA.spriteFor({ className, gender: c.gender, race: c.race, category: w.category, moveType }),
       name: u.name, cls: className, wpn: w.name || "",
       hp: num(".hp-cur", u.hp), max: (battle.maxHp && battle.maxHp[side]) || u.maxHp,
-      st: { dmg: num('[data-k="damage"] .n', 0), hit: num('[data-k="hit"] .n', 0), crt: num('[data-k="crit"] .n', 0), times: animTimes(el) },
+      st: { dmg: num('[data-k="damage"] .n', 0), hit: num('[data-k="hit"] .n', 0), crt: num('[data-k="crit"] .n', 0), times: animTimes(el), eff: animEff(side) },
+      elems: animElems(side), // v1.8.4:属性(パネルの名前の右・戦う前の頭の上)
       skills: animSkills(side),
       gauge: u.laguz ? { gauge: u.laguz.gauge, max: C.laguzGauge.max, transformed: !!u.laguz.transformed } : null, // v1.8.3
       color: colorName, transformed: el.classList.contains("transformed"), move: { category: w.category },
     };
+  }
+  // v1.8.4:特効(ATK の数字を光沢のある緑に)・属性(受け継いだ属性も)
+  function animEff(side) {
+    const u = side === "left" ? battle.L : battle.R, foe = side === "left" ? battle.R : battle.L;
+    try { return !!(u && foe && u.weapon && DB.isEffective(u.weapon, foe.className)); } catch (e) { return false; }
+  }
+  function animElems(side) {
+    const u = side === "left" ? battle.L : battle.R;
+    const c = (u && u.char) || {};
+    return [c.element, c.element2, c.element3, c.element4].filter((x) => x && x !== "なし");
   }
   // v1.8.1:ATK の「×2」(追撃・勇者の武器で2回以上攻撃できるとき)。キャラ枠の威力の表示から読む
   function animTimes(el) {
@@ -1396,7 +1510,7 @@
   // 化身などで威力・命中・必殺が変わったら、アニメの下の数字も合わせる
   function animStats(f) {
     if (!f) return;
-    for (const side of ["left", "right"]) if (f[side]) BA.setStats(side, { dmg: f[side].damage, hit: f[side].hit, crt: f[side].crit, times: f[side].times || 1 });
+    for (const side of ["left", "right"]) if (f[side]) BA.setStats(side, { dmg: f[side].damage, hit: f[side].hit, crt: f[side].crit, times: f[side].times || 1, eff: f[side].effective != null ? !!f[side].effective : animEff(side) });
   }
   function animSkillsSync() { for (const side of ["left", "right"]) BA.setSkills(side, animSkills(side)); }
   // 1つのイベントをアニメで見せる。true:見せ終わった(いつもの演出はしない)/ false:いつもの演出も続ける
@@ -1449,6 +1563,7 @@
     }
   }
   // v1.8.3:戦う前に、キャラの頭の上へ補正(バトル準備の戦闘予測の「補正」と同じ数字)を約1.5秒。待たずに戦いは進む
+  // v1.8.4:3秒に(1.5秒延長)。1行目に属性も出す
   function animBonusTags() {
     if (!anim.bonusPending || battle.skip) return;
     anim.bonusPending = false;
@@ -1458,7 +1573,7 @@
     for (const [side, u, foe] of [["left", L, R], ["right", R, L]]) {
       let b;
       try { b = B.bonusSummary(u, foe); } catch (err) { continue; }
-      BA.bonusTag(side, LABELS.map(([k, label]) => ({ label, v: b[k] || 0 })));
+      BA.bonusTag(side, LABELS.map(([k, label]) => ({ label, v: b[k] || 0 })), animElems(side)); // v1.8.4:属性も
     }
   }
   // 攻撃以外のイベント:アニメの上にも数字・文字を出す
@@ -2489,6 +2604,7 @@
     $("#ts-start").disabled = chars.length < T_.MIN || left !== 0;
     $("#ts-random").disabled = left <= 0 || chars.length < T_.MIN;
     $("#ts-start-note").textContent = chars.length < T_.MIN ? "" : left > 0 ? `あと${left}人選んでください(「残りをランダムで選ぶ」で埋められます)` : "組み合わせは開始のときにランダムで決まります。";
+    pkRefresh(); // v1.8.4
   }
   function togglePick(id) {
     const i = tsetup.picked.indexOf(id);
@@ -2850,7 +2966,8 @@
     $("#as-picked").innerHTML = c && !ike ? `選んだキャラ <b>${UI.esc(c.name)}</b>(${UI.esc(c.className)})` : "キャラを1人選んでください";
     renderArcDetail(c, ike);
     $("#as-start").disabled = !c;
-    $("#as-start-note").textContent = !c ? "" : "Lv1から始まります。最初に、ランダムの2つのスキルから1つを選びます。" + (ike ? "" : "(キャラ一覧の能力値は変わりません)");
+    $("#as-start-note").textContent = !c ? "" : "Lv1から始まります。最初に、ランダムの2つのスキルから1つを選びます。" + (ike ? "" : "(キャラ一覧の能力値は変わりません)キャラをダブルタップしても始められます。");
+    pkRefresh(); // v1.8.4
   }
   // 選んだキャラの能力値(アーケードの始まりの Lv1)と武器。ラグズは化身前/化身後の切り替えつき
   function renderArcDetail(c, ike) {
@@ -2901,6 +3018,7 @@
     $("#as-start").disabled = !ok;
     $("#as-start-note").textContent = ok ? "Lv1から始まります。最初に、1人ずつランダムの2つのスキルから1つを選びます。(キャラ一覧の能力値は変わりません)"
       : chars.length < A_.TEAM_SIZE ? `キャラが3人以上必要です(いま${chars.length}人)。` : `あと${A_.TEAM_SIZE - asetup.picks.length}人選んでください。`;
+    pkRefresh(); // v1.8.4
   }
   const pickArc = (id) => {
     if (asetup.mode === "team") {
@@ -2910,7 +3028,17 @@
     } else asetup.pick = id;
     renderArcSetup();
   };
-  $("#as-chars").addEventListener("click", (e) => { const li = e.target.closest("li[data-id]"); if (li) pickArc(li.dataset.id); });
+  // v1.8.4:アーケードの1対1は、キャラをダブルタップ(2回続けて押す)すると、そのキャラでそのまま始まる(3on3の選ぶ画面と同じ0.45秒)
+  let asLastTap = { id: null, t: 0 };
+  $("#as-chars").addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-id]");
+    if (!li) return;
+    const id = li.dataset.id, now = Date.now();
+    const dbl = asetup.mode === "normal" && asLastTap.id === id && now - asLastTap.t < 450;
+    asLastTap = dbl ? { id: null, t: 0 } : { id, t: now };
+    pickArc(id);
+    if (dbl && !$("#as-start").disabled) $("#as-start").click();
+  });
   $("#as-chars").addEventListener("keydown", (e) => {
     const li = e.target.closest("li[data-id]");
     if (li && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); pickArc(li.dataset.id); }
@@ -3962,6 +4090,7 @@
       : ttVs() && ttsetup.stage === 1 ? "次は2Pがチームを選びます。2Pに渡す前に、画面が隠れます。" : "スキルは対戦の前にランダムで決まります。";
     $("#ttsetup").classList.toggle("p2", ttsetup.stage === 2);
     $("#screen-ttsetup .screen-title").textContent = ttsetup.stage === 2 ? "3on3の準備(2Pのチーム)" : ttVs() ? "3on3の準備(1Pのチーム)" : "3on3の準備";
+    pkRefresh(); // v1.8.4
   }
   function toggleTT(id) {
     const i = ttsetup.picks.indexOf(id);
@@ -4583,6 +4712,124 @@
   }
   $("#btn-rematch").addEventListener("click", () => rematch(false));
   $("#btn-rematch-keep").addEventListener("click", () => rematch(true));
+
+
+  // ================= v1.8.4:スマホ縦の「その場の能力値パネル」 =================
+  // ガトー指示(最優先):「スマホ縦で、キャラ一覧・トーナメント・アーケードで、スクロールせずにキャラのステータスを常に確認しながら選択できるように」
+  //   画面の下に能力値パネル(#pk-dock)を固定し、押したキャラの能力値と武器をその場で出す(別のページに移らない)。
+  //   キャラの並びはスマホ縦では2列にして、多くのキャラが1画面に入るように。PC・横向きは今までどおり(パネルは出さない)
+  //   出すキャラ:キャラ一覧=選んだキャラ / トーナメント・3on3の準備=最後に押したキャラ / アーケード=選んだキャラ(Lv1の能力値)
+  var pkFocus = { tsetup: null, asetup: null, ttsetup: null };
+  var pkView = "human"; // ラグズの表示(化身前/化身後)。属性の右のスイッチで切りかえる
+  var PK_SCREENS = { list: "#char-list", tsetup: "#ts-chars", asetup: "#as-chars", ttsetup: "#tt-chars" };
+  function pkScreen() {
+    const a = $(".screen.active");
+    const name = a ? a.id.replace("screen-", "") : "";
+    return PK_SCREENS[name] ? name : null;
+  }
+  // 押したキャラを覚える(それぞれの画面の「選ぶ」処理より先に)
+  for (const [name, sel] of Object.entries(PK_SCREENS)) {
+    $(sel).addEventListener("click", (e) => { const li = e.target.closest("li[data-id]"); if (li && name !== "list") pkFocus[name] = li.dataset.id; }, true);
+  }
+  // アーケードの始まり(Lv1)のキャラ
+  function arcStartChar(c, ike) {
+    const st = A_.create(c, { mode: ike ? "ike" : "normal", rng: global.Rng.createSeededRng("asetup") });
+    return { ...A_.playerChar(st, ike ? A_.ikeChar(st) : c), arcadeLv: 1 };
+  }
+  function pkTarget(name) {
+    const pickOrFirst = (focus, picks) => {
+      const all = eligibleChars();
+      const id = [focus, ...(picks || []).slice().reverse()].find((x) => x && all.some((c) => c.id === x));
+      return id ? S.find(id) : all[0] || null;
+    };
+    if (name === "list") {
+      const c = selectedId && S.find(selectedId);
+      return c ? { char: c, note: "", list: true } : null;
+    }
+    if (name === "tsetup") {
+      const c = pickOrFirst(pkFocus.tsetup, tsetup.picked);
+      if (!c) return null;
+      const n = tsetup.picked.indexOf(c.id);
+      return { char: c, note: n >= 0 ? `<b>${n + 1}番目</b>に選択中` : "選んでいない" };
+    }
+    if (name === "ttsetup") {
+      const c = pickOrFirst(pkFocus.ttsetup, ttsetup.picks);
+      if (!c) return null;
+      const n = ttsetup.picks.indexOf(c.id);
+      return { char: c, note: n >= 0 ? `<b>${n + 1}番目</b>に選択中` : "選んでいない" };
+    }
+    if (name === "asetup") {
+      if (asetup.mode === "ike") return { char: arcStartChar(A_.ikeChar(null), true), note: "アイクモード(Lv1)" };
+      const team = asetup.mode === "team";
+      const c = team ? pickOrFirst(pkFocus.asetup, asetup.picks) : (asetup.pick && S.find(asetup.pick)) || pickOrFirst(pkFocus.asetup, []);
+      if (!c) return null;
+      const n = team ? asetup.picks.indexOf(c.id) : c.id === asetup.pick ? 0 : -1;
+      const note = team ? (n >= 0 ? `<b>${n + 1}番目</b>に選択中` : "選んでいない") : n >= 0 ? "<b>選択中</b>・始まりのLv1" : "始まりのLv1";
+      return { char: arcStartChar(c, false), note };
+    }
+    return null;
+  }
+  function pkRefresh() {
+    const dock = $("#pk-dock");
+    if (!dock) return;
+    const name = pkScreen();
+    const t = name && pkTarget(name);
+    document.body.classList.toggle("pk-on", !!t);
+    if (!t) { dock.innerHTML = ""; dock.hidden = true; pkPad(); return; }
+    dock.hidden = false;
+    const actions = t.list ? `<div class="pk-actions">
+        <button type="button" class="btn btn-small" id="pk-more">くわしく</button>
+        <button type="button" class="btn btn-small btn-main" data-golist="arena" ${isBanned(t.char) ? "disabled" : ""}>闘技場(1対1)</button>
+        <button type="button" class="btn btn-small btn-main" data-golist="arcade" ${isBanned(t.char) ? "disabled" : ""}>アーケード(1対1)</button></div>` : "";
+    dock.innerHTML = UI.peekCard(t.char, { form: pkView, note: t.note }) + actions;
+    pkPad();
+    global.requestAnimationFrame(pkPad);
+  }
+  // パネルの高さだけ、画面の下に余白をあける(一番下のキャラ・開始ボタンがパネルに隠れないように)
+  function pkPad() {
+    const dock = $("#pk-dock");
+    const h = dock && !dock.hidden && getComputedStyle(dock).display !== "none" ? Math.ceil(dock.getBoundingClientRect().height) : 0;
+    document.documentElement.style.setProperty("--pk-h", h + "px");
+  }
+  global.addEventListener("resize", () => { pkRefresh(); });
+  $("#pk-dock").addEventListener("change", (e) => {
+    if (!e.target.classList.contains("pk-form")) return;
+    pkView = e.target.checked ? "transformed" : "human";
+    pkRefresh();
+  });
+  $("#pk-dock").addEventListener("click", (e) => {
+    if (e.target.closest("#pk-more")) { $("#screen-list").classList.add("pk-detail-open"); return; }
+    const b = e.target.closest("[data-golist]");
+    if (b) goFromList(b.dataset.golist, selectedId);
+  });
+  $("#char-detail").addEventListener("click", (e) => {
+    if (e.target.closest(".pk-detail-close")) $("#screen-list").classList.remove("pk-detail-open");
+  });
+
+  // v1.8.4:キャラ一覧から、そのキャラで闘技場(1対1)・アーケード(1対1)へ(ガトー指示)
+  function goFromList(where, id) {
+    const c = id && S.find(id);
+    if (!c || isBanned(c)) return;
+    $("#screen-list").classList.remove("pk-detail-open");
+    tourMatch = null; arcMatch = null;
+    if (where === "arena") {
+      const keepRight = prep.right && !prep.right.arc && (prep.right.gen || (S.find(prep.right.charId) && prep.right.charId !== c.id));
+      prep.left = { charId: c.id, weaponId: c.weapons[0], bio: null, view: "human" };
+      if (!keepRight) {
+        const foe = S.list().find((x) => x.id !== c.id && !isBanned(x));
+        if (foe) prep.right = { charId: foe.id, weaponId: foe.weapons[0], bio: null, view: "human" };
+      }
+      goto("prep");
+      return;
+    }
+    if (loadArc()) { // 途中のアーケードがあるときは、その続きから(今までと同じ)
+      goto("arcade");
+      return;
+    }
+    asetup.mode = "normal";
+    asetup.pick = c.id;
+    goto("asetup");
+  }
 
   goto("title");
 })(window);

@@ -141,7 +141,7 @@
       return `<div class="stat${v >= max ? " capped" : ""}" data-k="${k}"><span class="stat-k">${DB.STAT_LABELS[k]}</span><span class="stat-bar"><i style="width:${pct}%"></i></span><span class="stat-v${v >= max ? " capped" : ""}">${v}</span></div>`;
     });
     rows.push(`<div class="stat"><span class="stat-k">体格</span><span></span><span class="stat-v">${char.stats.con}</span></div>`);
-    if (opts.element) rows.push(`<div class="stat stat-element"><span class="stat-k">属性</span>${elementChip(char.element, opts.foeElement)}</div>`);
+    if (opts.element) rows.push(`<div class="stat stat-element"><span class="stat-k">属性</span>${elementChip(char.element, opts.foeElement)}${opts.afterElement || ""}</div>`); // v1.8.4:afterElement(スマホ縦のラグズの化身前/化身後のスイッチ)
     return `<div class="stat-grid">${rows.join("")}</div>`;
   }
 
@@ -339,7 +339,50 @@
     return `<span class="skill-chip class-skill" title="兵種スキル:${esc(DB.baseClassName(className))}の${esc(name)}${s ? "(" + esc(s.description) + ")" : ""}">${esc(name)}</span>`;
   }
 
+
+  // v1.8.4:スマホ縦の「その場の能力値パネル」(キャラ一覧・トーナメント・アーケード・3on3の準備で、画面の下に固定)。
+  //   1枚に 名前・職業・兵種・属性(ラグズは属性の右に化身前/化身後のスイッチ)・能力値9つ(3列)・武器(1行ずつ)を入れる
+  //   opts.form:"human"(化身前)/"transformed"(化身後)、opts.toggleClass:スイッチの class、opts.note:右上の小さな文字
+  function formSwitch(form, cls) {
+    return `<label class="form-switch pk-switch" data-view="${form}" title="能力値の表示(化身前/化身後)">
+      <span class="fs-l">化身前</span><input type="checkbox" class="form-check ${cls}" ${form === "transformed" ? "checked" : ""} aria-label="化身後の能力値を表示">
+      <span class="fx-switch" aria-hidden="true"></span><span class="fs-r">化身後</span></label>`;
+  }
+  function peekCard(char, opts = {}) {
+    const laguz = char.race === "ラグズ" && !!char.statsHuman;
+    const form = laguz ? opts.form || "human" : "transformed";
+    const { stats, max } = formStats(char, form);
+    const cell = (k, label) => {
+      const v = k === "con" ? char.stats.con : stats[k];
+      const m = k === "con" ? 0 : max ? max[k] : 40;
+      const capped = m && v >= m;
+      return `<div class="pk-stat${capped ? " capped" : ""}" data-k="${k}"><span class="pk-k">${label}</span><b class="pk-v">${v}</b>${m ? `<span class="pk-bar"><i style="width:${Math.min(100, Math.round((v / m) * 100))}%"></i></span>` : '<span class="pk-bar pk-nobar"></span>'}</div>`;
+    };
+    const keys = ["hp", "str", "mag", "skl", "spd", "lck", "def", "res"];
+    const cells = keys.map((k) => cell(k, DB.STAT_LABELS[k])).join("") + cell("con", "体格");
+    const cls = DB.classByName[char.className];
+    const tribe = cls && cls.tribe ? `<span class="badge tribe">${esc(cls.tribe)}</span>` : "";
+    const lv = char.arcadeLv ? `Lv${char.arcadeLv}` : `Lv${char.level || 20}`;
+    const weapons = (opts.weapons || char.weapons).map((id) => {
+      const w = charWeapon(char, id);
+      if (!w) return "";
+      const st = (k, l) => weaponStatCell(w, k, l);
+      const eff = weaponEffect(w);
+      return `<li class="pk-w"><span class="pk-wn">${w.mark ? `<span class="forged">${esc(w.name)}</span>` : esc(w.name)}${w.custom ? '<span class="w-custom">◆</span>' : ""}${stars(w)}</span>
+        <span class="pk-ws">${st("might", "威")} ${st("hit", "命")} ${st("crit", "必")} ${st("weight", "重")}</span>${eff ? `<span class="pk-we">${esc(eff)}</span>` : ""}</li>`;
+    }).join("");
+    return `<div class="pk-card" data-id="${esc(char.id || "")}">
+      <div class="pk-head">${charIcon(char, "small")}
+        <div class="pk-title"><div class="pk-name">${esc(char.name)}${genderMark(char)}<small class="pk-class">${esc(char.className)} ${lv}</small></div>
+          <div class="pk-badges">${moveBadge(moveTypeOf(char))}${raceChip(char)}${tribe}${elementChip(char.element)}${laguz ? formSwitch(form, opts.toggleClass || "pk-form") : ""}</div></div>
+        ${opts.note ? `<span class="pk-note">${opts.note}</span>` : ""}</div>
+      <div class="pk-stats">${cells}</div>
+      <ul class="pk-weapons">${weapons}</ul>
+    </div>`;
+  }
+
   global.UI = {
+    peekCard, formSwitch,
     charWeapon, markBadge, classSkillChip, growthBonus,
     arcadeMark, esc, charIcon, weaponTypeLabel, formStats, weaponEffect, moveBadge, moveTypeOf, raceChip, fighterHeader, bonusText, bonusRow, elementBadge, elementText, elementChip, tagBadges, badges, genderMark,
     statGrid, statTable, triMark, weaponLine, weaponCard, weaponCards, charHeader, charCard,

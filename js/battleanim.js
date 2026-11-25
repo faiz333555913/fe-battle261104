@@ -153,7 +153,15 @@ function drawSprite(u, x, y, alpha, opt = {}) {
 }
 function drawUnit(u, x, alpha, ghost) {
   if (alpha <= 0) return;
-  drawSprite(u, x, FLOOR + u.dy + (u.land || 0), alpha, { ghost, tint: ghost ? u.tint : null });
+  // v1.8.4:浮いている鳥は、待っているあいだ ゆっくり上下(±1ドット)
+  const hover = isBird(u) && u.pose === 'idle' && u.dy >= 0 ? Math.round(Math.sin(T / 14)) : 0;
+  // 浮いているのが分かるように、地面に小さな影
+  if (isBird(u) && !ghost && u.dy >= 0 && (u.land || 0) < groundGap(u.kind, u.pose)) {
+    ctx.globalAlpha = 0.28 * alpha;
+    R(x - 9, FLOOR - 1, 18, 2, '#1a1208'); R(x - 6, FLOOR - 2, 12, 1, '#1a1208'); R(x - 6, FLOOR + 1, 12, 1, '#1a1208');
+    ctx.globalAlpha = 1;
+  }
+  drawSprite(u, x, FLOOR + u.dy + (u.land || 0) + hover, alpha, { ghost, tint: ghost ? u.tint : null });
 }
 
 
@@ -417,6 +425,7 @@ function panel(u, x0) {
   R(x0, 120, 128, 1, '#d8cca0'); R(x0, PB, 128, 1, '#d8cca0'); R(x0, 120, 1, H - 120, '#d8cca0'); R(x0 + 127, 120, 1, H - 120, '#d8cca0');
   R(x0 + 2, 122, 124, 1, u.accent); R(x0 + 2, PB - 2, 124, 1, u.accent);
   txt(u.name, x0 + 6, 132, 8, '#ffffff', 'left', 84);
+  elemChips(u, x0, 132); // v1.8.4
   txt(`${u.cls}／${u.wpn}`, x0 + 6, 142, 6, '#b8c4ff', 'left', 84);
   if (u.skills && u.skills.length) txt(u.skills.join('・'), x0 + 6, 151, 6, '#ffe08a', 'left', 116);
   const hy = 170;
@@ -440,10 +449,39 @@ function panel(u, x0) {
   }
   // 威力・命中・必殺は英大文字3文字で（ATK・HIT・CRT）。v1.8.1:2回以上攻撃できるときは ATK の数字の左に「×2」など
   [['ATK', u.st.dmg], ['HIT', u.st.hit], ['CRT', u.st.crt]].forEach(([k, v], i) => {
-    txt(k, x0 + 94, 133 + i * 11, 6, '#9ab0e8'); txt(String(v), x0 + 123, 133 + i * 11, 6, '#ffffff', 'right');
+    txt(k, x0 + 94, 133 + i * 11, 6, '#9ab0e8');
+    // v1.8.4:特効のときは ATK の数字を、光沢のある緑(能力値が上限のときの数字の色)に
+    if (i === 0 && u.st.eff) effText(String(v), x0 + 123, 133, 6);
+    else txt(String(v), x0 + 123, 133 + i * 11, 6, '#ffffff', 'right');
   });
   if (u.st.times > 1) txt(`×${u.st.times}`, x0 + 93, 133, 6, '#ffd040', 'right');
   gaugeBar(u, x0); // v1.8.3
+}
+// v1.8.4:特効の ATK の数字。上が白っぽく下が濃い緑のグラデーション(つや)+ 緑の光
+function effText(str, x, y, size) {
+  ctx.font = `bold ${size * S}px "Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#05060f'; ctx.fillText(str, x * S + S, y * S + S);
+  const g = ctx.createLinearGradient(0, (y - size) * S, 0, y * S);
+  g.addColorStop(0, '#f4ffd8'); g.addColorStop(0.45, '#c6f24a'); g.addColorStop(1, '#7cc22a');
+  ctx.save();
+  ctx.shadowColor = 'rgba(198, 242, 74, ' + (0.55 + 0.35 * Math.sin(T / 8)) + ')'; ctx.shadowBlur = 4 * S;
+  ctx.fillStyle = g; ctx.fillText(str, x * S, y * S);
+  ctx.restore();
+}
+// v1.8.4:属性(ガトー指示「属性と補正を表記」)。パネルの名前の右に、属性の色の小さな札(受け継いだ属性も並べる)
+const ELEM_COL = { 炎: ['#d9452f', '#fff'], 水: ['#2f6fd9', '#fff'], 風: ['#2fa36a', '#fff'], 雷: ['#d9b32f', '#222'], 光: ['#f3edd0', '#6b5a12'], 闇: ['#4b2a6e', '#fff'], 天: ['#5aa0e8', '#fff'], 地: ['#8a6a3a', '#fff'] };
+function elemChips(u, x0, y) {
+  if (!u.elems || !u.elems.length) return;
+  ctx.font = `bold ${8 * S}px "Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif`;
+  let x = x0 + 6 + Math.min(84, Math.ceil(ctx.measureText(u.name).width / S)) + 3;
+  for (const e of u.elems) {
+    if (x + 9 > x0 + 92) break;
+    const [bg, fg] = ELEM_COL[e];
+    R(x + 1, y - 7, 7, 9, bg); R(x, y - 6, 9, 7, bg);
+    txt(e, x + 4.5, y + 0.5, 6, fg, 'center');
+    x += 11;
+  }
 }
 function drawHUD() { panel(units.s, 0); panel(units.a, 128); }
 // v1.8.3:化身ゲージ(ラグズだけ)。スキルの行とHPの行のあいだに、20目盛りのバー。
@@ -461,7 +499,8 @@ function gaugeBar(u, x0) {
   }
 }
 // v1.8.3:戦う前に、キャラの頭の上へ補正(攻撃+3 など)を約1.5秒。だんだん透明になって消える(時間で消える。アニメは止めない)
-const BONUS_MS = 1500, BONUS_HOLD = 0.45;
+// v1.8.4:1.5秒 → 3秒(1.5秒延長。ガトー指示)。消え始めるまでも長く
+const BONUS_MS = 3000, BONUS_HOLD = 0.6;
 function drawBonus(u) {
   const b = u.bonusTag;
   if (!b) return;
@@ -481,7 +520,7 @@ function drawBonus(u) {
     ctx.textAlign = 'left';
     for (const t of line) {
       const yy = (top + i * 9 + 7) * S;
-      ctx.strokeText(t.text, x, yy); ctx.fillStyle = t.v > 0 ? '#8cf0a0' : '#ff8a7a'; ctx.fillText(t.text, x, yy);
+      ctx.strokeText(t.text, x, yy); ctx.fillStyle = t.col || (t.v > 0 ? '#8cf0a0' : '#ff8a7a'); ctx.fillText(t.text, x, yy);
       x += ctx.measureText(t.text + ' ').width;
     }
   });
@@ -1837,9 +1876,14 @@ function groundGap(kind, pose) {
   }
   return _gapCache[key];
 }
+// v1.8.4:タカ・カラス(化身した鳥)は、地上に降りきらずに少し浮いている(ガトー指示)。BIRD_FLOAT ドット上で、ゆっくり上下する
+const BIRD_FLOAT = 7;
+const isBird = u => u.beast && u.kind === u.beast && BIRDS.has(kin(u));
 function landStep(u) {
   const sp = SPR[u.kind];
-  const target = sp && sp.frames.fly1 && LAND_POSES.has(u.pose) && u.dy >= 0 ? groundGap(u.kind, u.pose) : 0;
+  const grounded = sp && sp.frames.fly1 && LAND_POSES.has(u.pose) && u.dy >= 0;
+  let target = grounded ? groundGap(u.kind, u.pose) : 0;
+  if (grounded && isBird(u)) target -= BIRD_FLOAT; // 地面から BIRD_FLOAT ドット上(マイナスは上へ)
   const cur = u.land || 0;
   u.land = cur < target ? Math.min(target, cur + 2) : Math.max(target, cur - 2);
   if (fast) u.land = target;
@@ -3202,7 +3246,8 @@ function applyInfo(u, p) {
   u.name = p.name; u.cls = p.cls; u.wpn = p.wpn;
   u.max = Math.max(1, p.max || 1);
   u.hp = Math.max(0, Math.min(u.max, p.hp)); u.disp = u.hp; u.hpFast = false; u.hpRed = 0; u.hpPop = 0;
-  if (p.st) u.st = { dmg: p.st.dmg, hit: p.st.hit, crt: p.st.crt, times: p.st.times || 1 };
+  if (p.st) u.st = { dmg: p.st.dmg, hit: p.st.hit, crt: p.st.crt, times: p.st.times || 1, eff: !!p.st.eff }; // v1.8.4:eff=特効
+  u.elems = (p.elems || []).filter((e) => ELEM_COL[e]); // v1.8.4:属性(パネルの名前の右)
   u.skills = (p.skills || []).slice();
   u.move = p.move || null;
   u.gauge = p.gauge ? { v: p.gauge.gauge, max: p.gauge.max, on: !!p.gauge.transformed } : null; // v1.8.3:化身ゲージ
@@ -3245,7 +3290,7 @@ function setHp(side, hp, max) {
 function setStats(side, st) {
   if (!sideReady() || !st) return;
   const u = unitOf(side);
-  u.st = { dmg: st.dmg, hit: st.hit, crt: st.crt, times: st.times != null ? st.times : (u.st && u.st.times) || 1 };
+  u.st = { dmg: st.dmg, hit: st.hit, crt: st.crt, times: st.times != null ? st.times : (u.st && u.st.times) || 1, eff: st.eff != null ? !!st.eff : !!(u.st && u.st.eff) }; // v1.8.4:eff=特効
 }
 // v1.8.1:パネルに出すスキル(キャラ枠に見えているスキル)
 function setSkills(side, list) { if (sideReady()) unitOf(side).skills = (list || []).slice(); }
@@ -3359,11 +3404,13 @@ function setGauge(side, g) {
   u.gauge = g ? { v: g.gauge, max: g.max || (u.gauge && u.gauge.max) || 20, on: !!g.transformed } : null;
 }
 // v1.8.3:補正を頭の上に出す。list:[{ label:'攻撃', v:3 }, ...](0 は出さない)
-function bonusTag(side, list) {
+// v1.8.4:elems(属性)があれば、1行目に「炎属性」(属性の色)。補正がなくても属性は出す
+function bonusTag(side, list, elems) {
   if (!sideReady() || fast) return;
   const items = (list || []).filter((x) => x.v).map((x) => ({ text: `${x.label}${x.v > 0 ? '+' : ''}${x.v}`, v: x.v }));
-  if (!items.length) return;
-  const lines = [];
+  const el = (elems || []).filter((e) => ELEM_COL[e]);
+  if (!items.length && !el.length) return;
+  const lines = el.length ? [[{ text: el.join('+') + '属性', v: 0, col: ELEM_COL[el[0]][0] === '#4b2a6e' ? '#c8a0ff' : ELEM_COL[el[0]][0] === '#f3edd0' ? '#fff6c8' : ELEM_COL[el[0]][0] }]] : [];
   for (let i = 0; i < items.length; i += 2) lines.push(items.slice(i, i + 2));
   unitOf(side).bonusTag = { lines, at: Date.now() };
 }
