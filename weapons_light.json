@@ -1,0 +1,98 @@
+{
+  "comment": "出典: pegasusknight.com『アイテム/光』(ガトー提供のスクリーンショットより2026-11-01時点で転記)。光属性に共通の特効は記載なし。パージは射程3~10の攻城兵器のため除外(exclusive:true)。 v1.3.4:レクスオーラをキャラ生成の抽選に解禁(ガトー指示)。",
+  "category": "light",
+  "weapons": [
+    {
+      "name": "ライト",
+      "weaponLv": "D",
+      "price": 800,
+      "might": 2,
+      "hit": 80,
+      "weight": 4,
+      "uses": 40,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 1,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "シャイン",
+      "weaponLv": "C",
+      "price": 2100,
+      "might": 4,
+      "hit": 75,
+      "weight": 6,
+      "uses": 30,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": null,
+      "exclusive": false
+    },
+    {
+      "name": "リザイア",
+      "weaponLv": "A",
+      "price": 3000,
+      "might": 7,
+      "hit": 70,
+      "weight": 12,
+      "uses": 20,
+      "crit": 0,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": "敵に与えたダメージ分、自分のHPを回復",
+      "desc": "与えたダメージ分HP回復",
+      "exclusive": false
+    },
+    {
+      "name": "パージ",
+      "weaponLv": "B",
+      "price": 1000,
+      "might": 10,
+      "hit": 70,
+      "weight": 8,
+      "uses": 5,
+      "crit": 0,
+      "range": [
+        3,
+        10
+      ],
+      "weaponExp": 3,
+      "effect": null,
+      "exclusive": true,
+      "exclusiveOwner": null,
+      "notes": "攻城兵器(範囲3~10)。1対1闘技場のランダム抽選からは除外(弓の攻城兵器と同方針)"
+    },
+    {
+      "name": "レクスオーラ",
+      "weaponLv": "S",
+      "price": null,
+      "might": 12,
+      "hit": 85,
+      "weight": 10,
+      "uses": 20,
+      "crit": 5,
+      "range": [
+        1,
+        2
+      ],
+      "weaponExp": 2,
+      "effect": "売却不可/守備+3",
+      "desc": "守備+3",
+      "exclusive": false,
+      "exclusiveOwner": null,
+      "notes": "専用キャラ表記なしだが売却不可(槍のゼーンズフト・雷のレクスボルトと同系統)。いったん除外側に寄せておく",
+      "note": "v1.3.4:キャラ生成で選べるように解禁(ガトー指示)"
+    }
+  ]
+}
