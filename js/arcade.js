@@ -199,7 +199,7 @@
 
   // ---- スキル ----
   // 味方が持てるスキル(抽選と同じ範囲。陽光は魔法の武器を持っているときだけ、エリートは上級職のあるベオクだけ)
-  // v1.6.3:判定は DB.skillFits と同じ(翼の守護はタカ・カラスだけ、大盾はそれ以外のラグズだけ)
+  // v1.6.3:判定は DB.skillFits と同じ(翼の守護はタカ・カラスだけ、v1.8.5:大盾はベオクだけ)
   function skillPoolFor(char, className) {
     const magic = (char.weapons || []).some((id) => DB.weapons[id] && DB.weapons[id].isMagic);
     return DB.skills.filter((s) => DB.skillFits(s, { race: char.race, className: className || char.className, magic }));

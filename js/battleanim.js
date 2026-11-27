@@ -479,9 +479,22 @@ function elemChips(u, x0, y) {
     if (x + 9 > x0 + 92) break;
     const [bg, fg] = ELEM_COL[e];
     R(x + 1, y - 7, 7, 9, bg); R(x, y - 6, 9, 7, bg);
-    txt(e, x + 4.5, y + 0.5, 6, fg, 'center');
+    // v1.8.5:字が札の下にずれていた(下ぞろえで書いていた)。札のまん中に字のまん中をそろえる
+    elemTxt(e, x + 4.5, y - 2.5, fg);
     x += 11;
   }
+}
+function elemTxt(str, cx, cy, color) {
+  ctx.save();
+  ctx.font = `bold ${6 * S}px "Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // 字の実際の高さで、上下のまん中を合わせる(フォントによる差をなくす)
+  const m = ctx.measureText(str);
+  const dy = (m.actualBoundingBoxAscent != null && m.actualBoundingBoxDescent != null) ? (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2 : 0;
+  ctx.textBaseline = 'alphabetic';
+  const by = cy * S + (dy || 3 * S * 0.8);
+  ctx.fillStyle = color; ctx.fillText(str, cx * S, by);
+  ctx.restore();
 }
 function drawHUD() { panel(units.s, 0); panel(units.a, 128); }
 // v1.8.3:化身ゲージ(ラグズだけ)。スキルの行とHPの行のあいだに、20目盛りのバー。
@@ -561,6 +574,19 @@ async function resolve0(a, d, o, impX, impY) {
     if (rec.none) return;
     o = Object.assign({}, o, { hit: rec.hit, crit: !!rec.crit });
   }
+  // v1.8.5:大盾・翼の守護・キャンセル:攻撃が届いた瞬間に防ぐ(青い光の盾 →「無効」)。影:見失って外れる
+  //   ゲームに知らせて、スキルの帯をこの瞬間に出す(onGuard)
+  if (rec && rec.band != null && onGuard) { try { onGuard(rec); } catch (e) { /* 演出だけ */ } }
+  if (rec && rec.ward) {
+    d.flash = 6; d.pose = 'idle';
+    spark(impX, impY, false);
+    ring(d.x, midY(d), 14, WARD, 24, 1);
+    popText('無効', d.x - d.dir * 4, FLOOR - 44, '#a8d8ff', 11);
+    shake = 4; shakeAmp = 1;
+    for (let i = 0; i < 4; i++) { d.x -= d.dir; await frame(); }
+    await wait(6);
+    return;
+  }
   if (rec && rec.guarded) {   // 女神の加護:弾かれて0
     spark(impX, impY, false); d.flash = 6;
     popText('0', d.x, FLOOR - 42, '#a8d8ff', 11);
@@ -587,7 +613,7 @@ async function resolve0(a, d, o, impX, impY) {
   } else {
     // 回避：残像を残して後ろへ跳ぶ
     d.pose = 'dodge';
-    popText('MISS', d.x - d.dir * 6, FLOOR - 44, '#a8d8ff', 9);
+    popText(rec && rec.lost ? '見失った' : 'MISS', d.x - d.dir * 6, FLOOR - 44, '#a8d8ff', 9); // v1.8.5:影
     for (let i = 0; i < 7; i++) { d.ghosts.push({ x: d.x, dy: d.dy, a: 0.5, pose: 'dodge' }); d.x -= d.dir * 3; d.dy = -Math.round(Math.sin(i / 6 * Math.PI) * 4); await frame(); }
     d.dy = 0;
   }
@@ -3202,6 +3228,8 @@ const STEPS_PER_SEC = 54;
 // v1.8.1:とどめのスロー。HPが0になってから KO_SLOW_STEPS コマのあいだ、KO_SLOW 倍ゆっくり(倒れたキャラが消えるまで)
 const KO_SLOW = 2.2, KO_SLOW_STEPS = 64;
 let slowKo = 0, onKo = null, koExtra = 60, koWatch = null;
+let onGuard = null; // v1.8.5:大盾などで防いだ瞬間に呼ぶ
+const WARD = ['#ffffff', '#d8f0ff', '#8cc8ff', '#4a90e0'];
 let lastT = 0;
 function loop(t) {
   if (!running) return;
@@ -3421,6 +3449,7 @@ global.BattleAnim = {
   ougiSelf, transform, ko, hurt, heal, sleep, glow, popAt, setGauge, bonusTag,
   flush, spriteFor, moveFor,
   onKo: (f) => { onKo = f || null; }, // v1.8.1:HPが0になった瞬間に呼ぶ(side)
+  onGuard: (f) => { onGuard = f || null; }, // v1.8.5:大盾・翼の守護・影・キャンセルで防いだ瞬間に呼ぶ(rec)
   setSpeed: (s) => { speed = s || 1; },
   isFast: () => fast,
   // テスト用

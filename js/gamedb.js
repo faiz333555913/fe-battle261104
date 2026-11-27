@@ -227,7 +227,7 @@
   // v1.6.3:抽選に出てよいスキルか(抽選・アーケードの持ち越し・トーナメントの交換・スキル選択で共通)
   //   who = { race, className, magic }(magic:魔法の武器を持っている/使う)
   //   兵種スキル(classOnly)は出ない。陽光は魔法だけ。エリートは上級職のあるベオクだけ。
-  //   翼の守護はタカ・カラスだけ(onlyClasses)。大盾はタカ・カラス以外のラグズだけ(laguzOnly + excludeClasses)
+  //   翼の守護はタカ・カラスだけ(onlyClasses)。v1.8.5:大盾はベオクだけ(raceOnly。前はタカ・カラス以外のラグズだけ)
   function skillFits(s, who) {
     if (!s || s.classOnly) return false;
     const laguz = who.race === "ラグズ";
@@ -235,6 +235,7 @@
     if (s.magicOnly && !who.magic) return false;
     if (s.beorcOnly && (laguz || !promotionOf(who.className))) return false;
     if (s.onlyClasses && !s.onlyClasses.includes(base)) return false;
+    if (s.raceOnly && who.race !== s.raceOnly) return false;
     if (s.laguzOnly && (!laguz || (s.excludeClasses || []).includes(base))) return false;
     return true;
   }

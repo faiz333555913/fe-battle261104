@@ -140,7 +140,7 @@
   // スキルの抽選(v1.3.4):陽光は魔法系の武器を使うときだけ。女神の加護は v1.7.1 から出ない(Config.noRouletteSkills)
   // v1.4.5:兵種スキル(俊足)は抽選に出ない。エリートはベオク(上級職があるとき)だけ
   // v1.5.0:武器スキルと同じスキルは抽選に出ない(かぶらないように)
-  // v1.6.3:使える・使えないの判定は DB.skillFits にまとめた(翼の守護はタカ・カラスだけ、大盾はそれ以外のラグズだけ)
+  // v1.6.3:使える・使えないの判定は DB.skillFits にまとめた(翼の守護はタカ・カラスだけ、v1.8.5:大盾はベオクだけ)
   function skillPool(u) {
     const ws = u && u.weapon && u.weapon.weaponSkill;
     const who = u ? { race: u.laguz || (u.char && u.char.race === "ラグズ") ? "ラグズ" : "ベオク", className: u.className, magic: !!u.weapon.isMagic } : { race: "ベオク", className: "", magic: false };
@@ -553,6 +553,7 @@
         u.rageOn = names.length > 0;
       }
     }
+    // v1.8.5:extra.guardFor = 相手の攻撃を受けて発動するスキル(大盾・翼の守護・影・祈り・女神の加護)。戦闘アニメでは、その攻撃が届いた瞬間に帯を出す
     const skillUp = (u, name, text, extra) => push({
       type: "skill", actor: u.side, skill: name,
       ougi: C.ougiSkills.includes(name),
@@ -619,7 +620,7 @@
       const fx = opts.fx || null; // v1.6.4:奥義の演出(流星・月光・太陽・天空)
       // v1.6.4:『影』15%の確率で、相手は見失い、攻撃が外れる(v1.7.4:25%)
       if (hasSkill(def, att, "影") && rng.percent(C.shadow.missPercent)) {
-        skillUp(def, "影", `${att.name}は${def.name}を見失った`);
+        skillUp(def, "影", `${att.name}は${def.name}を見失った`, { guardFor: att.side });
         push({ type: "miss", actor: att.side, target: def.side, lead, result: "見失った!", fx, n: opts.n, text: `${lead}……見失った!` });
         return;
       }
@@ -627,10 +628,13 @@
         push({ type: "miss", actor: att.side, target: def.side, lead, result: "ミス!", fx, n: opts.n, text: `${lead}……ミス!` });
         return;
       }
-      // v1.6.3:『大盾』は翼の守護と同じ効果(タカ・カラス以外のラグズ)
+      // v1.6.3:『大盾』は翼の守護と同じ効果(v1.8.5:ベオクだけ)
+      // v1.8.5:発動したら、相手の攻撃(外れ)も記録する。前は発動だけで攻撃の記録がなく、
+      //   戦闘アニメでは相手が攻撃せず、帯だけ出ていた(「敵の攻撃 → 大盾発動 → 防ぐ」に)
       const wardName = hasSkill(def, att, "翼の守護") ? "翼の守護" : hasSkill(def, att, "大盾") ? "大盾" : null;
       if (wardName && sklRoll(def, att)) {
-        skillUp(def, wardName, "攻撃を無効にした");
+        skillUp(def, wardName, "攻撃を無効にした", { guardFor: att.side });
+        push({ type: "miss", actor: att.side, target: def.side, lead, result: `${wardName}で防いだ!`, ward: wardName, fx, n: opts.n, text: `${lead}……${def.name}は${wardName}で防いだ!` });
         return;
       }
       // v1.4.3:『護り手』はデビルアクスが暴発しない
@@ -641,7 +645,7 @@
       }
       // 『女神の加護』(v1.3.4):ダメージを受けない(最初の1回だけ発動の演出を出す)
       if (goddessGuards(def, att)) {
-        if (!def.goddessShown) { def.goddessShown = true; skillUp(def, goddessName(def, att), "ダメージを無効にした"); }
+        if (!def.goddessShown) { def.goddessShown = true; skillUp(def, goddessName(def, att), "ダメージを無効にした", { guardFor: att.side }); }
         const result = `${def.name}にダメージを与えられない!`;
         push({ type: "hit", actor: att.side, target: def.side, damage: 0, dealt: 0, crit: false, guarded: true, lead, result, fx, n: opts.n, text: `${lead}${result}` });
         return;
@@ -686,10 +690,10 @@
       if (damage >= def.hp && def.hp > 0 && hasSkill(def, att, "祈り")) {
         // v1.6.1:アイクモードのアイクの祈りは「幸運%でHPが1残る」(発動しなければそのまま)
         if (def.char && def.char.ike) {
-          if (rng.percent(curStats(def, att).lck)) { damage = def.hp - 1; skillUp(def, "祈り", "HPが1残った"); }
+          if (rng.percent(curStats(def, att).lck)) { damage = def.hp - 1; skillUp(def, "祈り", "HPが1残った", { guardFor: att.side }); }
         } else {
           damage = Math.floor(damage / 2);
-          skillUp(def, "祈り", "ダメージが半分に");
+          skillUp(def, "祈り", "ダメージが半分に", { guardFor: att.side });
         }
       }
       damage = mercy(att, def, damage);

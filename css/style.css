@@ -2626,3 +2626,17 @@ html:has(#screen-battle.active), body:has(#screen-battle.active) { overflow-x: h
 body:has(#screen-title.active) .topbar { background: none; }
 .fc-head .fc-k { white-space: nowrap; } /* v1.8.4:名前の横に「化身」ボタンが入っても「戦闘予測」を1行に */
 @media (orientation: portrait) and (max-width: 600px) { .fc-form { margin: 0 4px; padding: 1px 6px; font-size: 11px; } }
+
+/* =========================================================
+   v1.8.5:アーケードの準備 ―「タイトルへ戻る」の段の一番右に「アーケード開始」をいつも出す
+   ========================================================= */
+.topbar .nav-arcstart { margin-left: auto; pointer-events: auto; min-width: 0; padding: 7px 22px; font-size: 15px; white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .6); }
+.topbar .nav-arcstart[hidden] { display: none; }
+@media (max-width: 600px) {
+  .topbar .nav-arcstart { padding: 6px 14px; font-size: 14px; }
+}
+/* スマホ横向きは上の段がなく「タイトルへ戻る」が上のまん中に浮いているので、同じ高さの右端に */
+@media (max-height: 500px) and (orientation: landscape) {
+  .topbar .nav-arcstart { position: fixed; top: 1px; right: 8px; z-index: 60; padding: 4px 14px; font-size: 12px; line-height: 1.4; }
+}

@@ -27,6 +27,7 @@
     if (name !== "prep" && name !== "battle") { tourMatch = null; arcMatch = null; } // トーナメント・アーケードの試合の準備をやめた
     $$(".screen").forEach((s) => s.classList.toggle("active", s.id === "screen-" + name));
     $("#nav-home").hidden = name === "title";
+    $("#nav-arcstart").hidden = name !== "asetup"; // v1.8.5
     if (name === "title") enterMenu();
     if (name === "list") renderList();
     if (name === "prep") renderPrep();
@@ -67,6 +68,7 @@
     // v1.6.5:「◯◯だけ」の「だけ」を削除(ガトー指示)
     if (s.magicOnly) tags.push("魔法を使うキャラ");
     if (s.beorcOnly) tags.push("ベオク");
+    if (s.raceOnly) tags.push(s.raceOnly); // v1.8.5:大盾はベオクだけ
     if (s.onlyClasses) tags.push(`${s.onlyClasses.join("・")}`);
     if (s.laguzOnly) tags.push(s.excludeClasses ? `${s.excludeClasses.join("・")}以外のラグズ` : "ラグズ");
     const weapons = Object.values(DB.weapons).filter((w) => w.weaponSkill === s.name).map((w) => w.name);
@@ -1437,7 +1439,7 @@
   const ANIM_KEY = "arenaBattle.battleAnim";
   let animPref = false;
   try { animPref = global.localStorage.getItem(ANIM_KEY) === "1"; } catch (e) { /* 初期値のまま(OFF) */ }
-  const anim = { pend: {}, quiet: new WeakSet(), shown: false, syncing: false };
+  const anim = { pend: {}, quiet: new WeakSet(), shown: false, syncing: false, guardQ: [] };
   const animActive = () => !!BA && animPref && anim.shown;
   // ゲームの奥義 → アニメの奥義
   const ANIM_OUGI = { 流星: "meteor", 月光: "luna", 太陽: "sol", 天空: "aether", 瞬殺: "lethal", 陽光: "sunray", 鳴動: "quake", 衝撃: "impact", 狙撃: "snipe", 咆哮: "roar", 地の祝福: "earth", 空の祝福: "sky" };
@@ -1499,6 +1501,7 @@
       return;
     }
     anim.pend = {};
+    anim.guardQ = []; // v1.8.5
     BA.setSpeed(battle.speed);
     BA.setup(animDesc("left"), animDesc("right"));
     BA.mount(arena);
@@ -1507,6 +1510,8 @@
     arena.classList.add("ba-on");
   }
   function animStop() { if (BA && anim.shown) BA.flush(); }
+  // v1.8.5:預かっていた防ぐスキルの記録(結果まで飛ばしたとき)
+  function animFlushGuards() { for (const g of anim.guardQ.splice(0)) applyState(g); }
   // 化身などで威力・命中・必殺が変わったら、アニメの下の数字も合わせる
   function animStats(f) {
     if (!f) return;
@@ -1516,6 +1521,11 @@
   // 1つのイベントをアニメで見せる。true:見せ終わった(いつもの演出はしない)/ false:いつもの演出も続ける
   async function animEvent(e, token) {
     if (e.type === "round") { anim.pend = {}; animTurnTags(e.first); animBonusTags(); return false; }
+    // v1.8.5:相手の攻撃を防ぐスキル(大盾・翼の守護・影)は、相手の攻撃が当たる瞬間に帯を出す
+    //   (前は帯が先に出て、相手の攻撃は動かなかった)。ここでは預かるだけ
+    if (e.type === "skill" && e.guardFor) { anim.guardQ.push(e); return true; }
+    // v1.8.5:『キャンセル』で無効にされた攻撃も、攻撃の動きを見せてから「無効」(前は数字だけで動かなかった)
+    if (e.type === "cancel") return animCancel(e, token);
     // v1.8.3:『空の祝福』は奥義の演出をやめて、『回復』と同じ回復の演出(緑の光と +の数字)にする
     if (e.type === "skill" && e.skill === "空の祝福" && e.heal) { animNote(e); return false; }
     if (e.type === "hit" || e.type === "miss") return animStrike(e, token);
@@ -1602,6 +1612,16 @@
       default: break;
     }
   }
+  // v1.8.5:『キャンセル』で無効にされた攻撃:攻撃の動き → 当たる瞬間に「無効」
+  async function animCancel(e, token) {
+    const T = e.actor === "left" ? "right" : "left";
+    BA.setSpeed(battle.speed);
+    await BA.attack(e.actor, { recs: [{ hit: false, ward: "キャンセル", hpAfter: e.hp[T] }], heals: [], hpEnd: { left: e.hp.left, right: e.hp.right } });
+    if (token !== battle.token) return true;
+    applyState(e);
+    if (!battle.skip) await wait(250, token);
+    return true;
+  }
   // 攻撃をアニメで見せる。同じキャラの続けての攻撃(流星・天空・勇者の武器・ぶちかまし)は1回の動きにまとめる
   async function animStrike(e, token) {
     const evs = battle.events, start = battle.idx - 1;
@@ -1615,7 +1635,9 @@
     // v1.8.1:追撃(攻速の差)。勇者の武器以外で、同じキャラの攻撃が相手の攻撃をはさまずに続いたら(後攻の「攻撃+追撃」など)、
     //   1回の動きにまとめ、追撃はその場で続けて攻撃する(サンプル4の追撃の動き)
     let follows = 0;
-    const between = (x) => ["heal", "spd-down", "status-add", "gauge"].includes(x.type) || (fxGroup && x.type === "skill" && !x.ougi);
+    const isGuard = (x) => x.type === "skill" && x.guardFor === A; // v1.8.5:大盾・翼の守護・影
+    // v1.8.5:流星・天空の途中で相手の『怒り』『勇将』が発動しても、奥義の動きを途中で切らない(前は残りの攻撃がふつうの攻撃になっていた)
+    const between = (x) => ["heal", "spd-down", "status-add", "gauge"].includes(x.type) || isGuard(x) || (fxGroup && (x.type === "rage" || (x.type === "skill" && !x.ougi)));
     const strikes = [e];
     let last = start;
     for (let j = start + 1; j < evs.length; j++) {
@@ -1623,7 +1645,7 @@
       const isStrike = (x.type === "hit" || x.type === "miss") && x.actor === A && x.target === T && !prev.finishing;
       if (isStrike && ((fxGroup && x.fx === e.fx) || x.bodySlam || (brave && !x.fx && !e.fx && !x.instantKill && strikes.length < 2))) { strikes.push(x); last = j; continue; }
       if (isStrike && !brave && !fxGroup && !wind && !e.instantKill && !x.fx && !x.instantKill && !isWind(x) && !follows && !anim.pend[A]
-        && evs.slice(start + 1, j).every((y) => y.type !== "skill")) { follows++; strikes.push(x); last = j; continue; }
+        && evs.slice(start + 1, j).every((y) => y.type !== "skill" || isGuard(y))) { follows++; strikes.push(x); last = j; continue; }
       if (between(x)) continue;
       break;
     }
@@ -1638,7 +1660,23 @@
     }
     delete anim.pend[A];
     const group = evs.slice(start, last + 1);
-    const recs = strikes.map((x) => ({ hit: x.type === "hit", crit: !!x.crit, damage: x.damage || 0, hpAfter: x.hp[T], guarded: !!x.guarded }));
+    const recs = strikes.map((x) => ({ hit: x.type === "hit", crit: !!x.crit, damage: x.damage || 0, hpAfter: x.hp[T], guarded: !!x.guarded, ward: x.ward || null, lost: x.result === "見失った!" }));
+    // v1.8.5:相手の攻撃を受けて発動するスキル(大盾・翼の守護・影・祈り・女神の加護)の帯は、その攻撃が届いた瞬間に出す
+    //   (前は帯が先に出てから攻撃していた。大盾は攻撃の記録がなく、攻撃の動きもなかった)
+    const stashed = anim.guardQ.splice(0);
+    const guards = stashed.concat(group.filter(isGuard));
+    const bandsOf = strikes.map(() => []);
+    for (const g of stashed) bandsOf[0].push(g);
+    for (const g of group.filter(isGuard)) {
+      const k = strikes.findIndex((x) => group.indexOf(x) > group.indexOf(g));
+      if (k >= 0) bandsOf[k].push(g);
+    }
+    recs.forEach((r, k) => { if (bandsOf[k].length) r.band = k; });
+    BA.onGuard((rec) => {
+      const list = rec && rec.band != null ? bandsOf[rec.band] : [];
+      if (battle.skip || token !== battle.token) return;
+      for (const g of list) animate(g);
+    });
     const heals = group.filter((x) => x.type === "heal" && x.actor === A).map((x) => x.amount);
     const lastEv = group[group.length - 1];
     $$(".fighter").forEach((f) => f.classList.toggle("attacking", f === fighterEl(A)));
@@ -1653,13 +1691,15 @@
     });
     try {
       await BA.attack(A, { recs, heals, ougi, wind, hpEnd: { left: lastEv.hp.left, right: lastEv.hp.right } });
-    } finally { BA.onKo(null); }
+    } finally { BA.onKo(null); BA.onGuard(null); }
     battle.idx = last + 1;
     if (token !== battle.token) { endKo(); return true; }
     // 記録(ログ・キャラ枠のHPなど)はアニメのあとにまとめて。とどめはいつもの K.O. の演出
     // (途中のHPをアニメに戻すと、HPが一度増えてからまた減って見え、倒れたキャラが出てきてしまうので、アニメのHPはそのまま)
     anim.syncing = true;
     try {
+      // v1.8.5:攻撃の前に預かった防ぐスキル(大盾など)の記録
+      for (const g of guards) if (!group.includes(g)) { applyState(g); animSkillsSync(); }
       for (const x of group) {
         if (battle.skip) { applyState(x); continue; }
         if ((x.type === "hit" || x.type === "miss") && x.finishing) {
@@ -1679,6 +1719,8 @@
         }
         applyState(x);
         animStats(x.forecast);
+        // v1.8.5:まとめた中の『怒り』『勇将』は、攻撃のあとに発動の帯を出す
+        if (x.type === "rage") { animNote(x); if (!(await wait(animate(x), token)) && token !== battle.token) return true; }
       }
     } finally { anim.syncing = false; }
     if (!battle.skip && !lastEv.finishing) await wait(250, token);
@@ -1886,7 +1928,10 @@
     if (now && now.hp) for (const side of ["left", "right"]) { $(".hp-max", fighterEl(side)).textContent = battle.maxHp[side]; setHp(side, now.hp[side]); }
     for (const side of ["left", "right"]) {
       const u = side === "left" ? battle.L : battle.R;
-      if (u.laguz) setGauge(side, { gauge: u.laguz.gauge, transformed: u.laguz.transformed });
+      // v1.8.5:戦いの途中で描き直すとき(援軍・変身)は、そのときの化身ゲージ・化身の状態(now.laguz)で。
+      //   前は戦う前の状態(化身前)で描いていたので、戦闘アニメでは化身しているラグズが元の姿に戻っていた(数字は化身のまま)
+      const g = now && now.laguz && now.laguz[side] ? now.laguz[side] : u.laguz ? { gauge: u.laguz.gauge, transformed: u.laguz.transformed } : null;
+      if (g) setGauge(side, g);
     }
     $("#arena-fx").innerHTML = "";
     endKo();
@@ -2234,7 +2279,7 @@
     if (lead == null || !(await wait(lead, token))) return false;
     if (e.type === "miss") {
       li.textContent = `${e.lead}……${e.result}`;
-      floatText(e.target, e.result === "見失った!" ? "見失った" : "MISS", "miss");
+      floatText(e.target, e.result === "見失った!" ? "見失った" : e.ward ? "無効" : "MISS", "miss"); // v1.8.5:大盾・翼の守護は「無効」
       applyState(e, false);
       if (e.fx && (e.fx !== "meteor" || e.n === 5) && (e.fx !== "aether" || e.n === 2)) ougiKeep(700);
       return wait(e.fx === "meteor" && e.n < 5 ? 260 : 600, token);
@@ -2427,7 +2472,7 @@
       if (e.type === "phase2") { if (!(await playPhase2(e, token)) && token !== battle.token) return; continue; }
       // v1.6.3:『援軍』が参戦する/倒れて元のキャラに戻る
       if (e.type === "swap") { if (!(await playSwap(e, token)) && token !== battle.token) return; continue; }
-      if (battle.skip) { applyState(e); continue; }
+      if (battle.skip) { animFlushGuards(); applyState(e); continue; }
       // v1.8.0:戦闘アニメ(ONのとき)。攻撃・奥義・化身はアニメで見せる。それ以外はいつもどおり(アニメにも数字などを出す)
       if (animActive()) {
         const r = await animEvent(e, token);
@@ -3062,6 +3107,11 @@
     asetup.view = e.target.checked ? "transformed" : "human";
     renderArcSetup();
   });
+  // v1.8.5:上の段の「アーケード開始」は、下の開始ボタンと同じ(押せる・押せないも同じ)
+  const arcTopSync = () => { $("#nav-arcstart").disabled = $("#as-start").disabled; };
+  new MutationObserver(arcTopSync).observe($("#as-start"), { attributes: true, attributeFilter: ["disabled"] });
+  arcTopSync();
+  $("#nav-arcstart").addEventListener("click", () => { if (!$("#as-start").disabled) $("#as-start").click(); });
   $("#as-start").addEventListener("click", () => {
     if (asetup.mode === "team") {
       const chars = asetup.picks.map((id) => S.find(id)).filter(Boolean);
